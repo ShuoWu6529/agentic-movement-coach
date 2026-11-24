@@ -36,3 +36,55 @@ CI (`.github/workflows/ci.yml`) runs: `npm ci`, `check:data`, `typecheck`, `lint
 - `src/app/`: React shell (phase reducer, screens, components).
 - `public/config/targets.json`: therapist config, fetched with `cache: 'no-store'`.
 - `docs/definitions.md`: attempt, repetition, angle, latency and scoring definitions.
+
+## Code Review Rules
+
+Flag only issues that would change a reviewer's decision. Rules are ordered by consequence; treat violations of the first four sections as P0 or P1. Tests, lint, typecheck and `check:data` run in CI, so don't re-flag what they already catch.
+
+### Advice is withheld when tracking is unreliable
+
+- Any path that can show a movement cue (text, overlay colour, counter change, summary note) must be blocked while tracking is unreliable, meaning required landmarks are missing or below the configured confidence and visibility thresholds.
+  Safe path: show only the "can't see you well" state and pause the set. An attempt in progress when tracking is lost is discarded, and completed repetitions are kept (`docs/definitions.md`).
+- Flag a new cue, rule or counting path that bypasses the reliability gate, and any log entry that pairs a movement-advice rule ID with an unreliable-tracking frame.
+
+### No diagnosis, prescription or clinical claims
+
+- User-facing text must not diagnose, suggest changing the therapist's targets, prescribe exercises, or encourage pushing through pain or discomfort.
+  Safe path: neutral, encouraging cues that refer to the configured target.
+- The "experimental, not clinically validated" notice must stay visible from exercise selection through the summary.
+- Docs, UI and the report must not present the 5° / 95% / 90% / 85% prototype targets or pilot results as clinical standards or evidence.
+
+### Video and personal data stay out of the network and out of git
+
+- Flag any code that sends camera frames, recorded video or per-frame landmarks off the device (fetch, XHR, WebSocket, beacons, analytics or error-reporting SDKs, third-party scripts that can see the video element), and any backend, account or cloud-storage dependency. v1 has none.
+  Safe path: process in the browser and give the user a local download of the session log.
+- Flag anything under `data/`, or any video, image, trace, log or consent record from a volunteer, being tracked in git, or a change that weakens `check:data`.
+
+### Evaluation integrity
+
+- Development and test recordings are separate. Flag changes that tune thresholds, rules or code against test-set recordings, or that mix the two sets.
+- Thresholds and targets (tolerances, hold seconds, tempo bounds, completion rules) live in `public/config/targets.json` and its schema in `src/core/config`, not as literals in rule or exercise logic. Flag hard-coded targets.
+- Flag edits to frozen threshold values, or a config shape change, without a `schemaVersion` bump and a matching schema and test update.
+- Flag changes to how an attempt, repetition, angle, tempo, lean or latency is computed that don't match `docs/definitions.md`, or definitions edits with no matching code change. Scoring is per attempt, and a true positive is an app cue matching a therapist-labeled issue in that attempt.
+- A missing or invalid config must show the config error and stop. Flag any fallback that guesses targets and starts a set.
+
+### Log, trace and rule-ID contract
+
+- Every cue has a stable rule ID from the rule registry (`src/core/rules`). The log and trace schemas (`src/core/log`, `src/core/trace`) carry the timestamps, angles, state, tracking confidence and rule IDs that scoring and latency measurement depend on.
+  Safe path: when a field or rule ID must change, version the schema and update its tests and any consumer in the same change.
+- Flag renamed or removed rule IDs or log fields, and changes that move or drop the timestamps used to measure feedback delay.
+
+### Movement-logic correctness
+
+- Angle and lean maths must respect landmark visibility and the camera view each exercise assumes (side for knee extension, 45° front-side for sit-to-stand, front for shoulder raise), and treat left and right consistently, in the unmirrored orientation.
+- Flag a counter that can double-count, count a partial movement (for example a sit-to-stand that never reaches standing), or keep counting through a pause or tracking loss.
+- Flag blocking or heavy per-frame work added to the frame loop; feedback delay has a target (median 300 ms or less).
+
+### Supply chain and spec changes
+
+- Flag a change that bypasses or re-pins the sha256 check for model or wasm files in `scripts/fetch-models.mjs` without a stated review of what changed upstream.
+- Flag edits to `SPEC.md` requirements or acceptance criteria that the PR description doesn't call out.
+
+### What not to flag
+
+Formatting, import order, naming and style preferences, the `src/core/` purity boundary (ESLint enforces it), and doc wording nits unless they contradict `SPEC.md` or a rule above.
