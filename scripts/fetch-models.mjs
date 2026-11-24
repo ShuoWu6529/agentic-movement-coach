@@ -12,7 +12,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pub = join(root, 'public');
 const BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 
-// sha256 sums recorded by the M0.5 spike (spike/public/models/SHA256SUMS).
+// These pinned sha256 sums are the source of truth. They were first recorded by the M0.5 spike,
+// which is not committed. Re-pin only after reviewing an upstream model change (AGENTS.md).
 const MODELS = [
   {
     file: 'pose_landmarker_full.task',

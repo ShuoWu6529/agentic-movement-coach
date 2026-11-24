@@ -3,7 +3,9 @@
 // Ranges are sanity bounds to catch typos, not clinical limits.
 
 import { z } from 'zod';
-import { isRuleId } from '../rules/registry';
+import { isRuleId, RULES } from '../rules/registry';
+
+const ADVICE_RULE_IDS = RULES.filter((r) => r.kind === 'advice').map((r) => r.ruleId);
 
 const num = (min: number, max: number, unit: string, opts: { int?: boolean } = {}) =>
   (opts.int ? z.number().int() : z.number()).min(min).max(max).meta({ unit });
@@ -39,35 +41,55 @@ export const TargetsConfigSchema = z.strictObject({
   cues: z.strictObject({
     displayMs: num(0, 30000, 'ms', { int: true }),
     cooldownMs: num(0, 60000, 'ms', { int: true }),
-    dwellMs: z.record(
-      z.string().refine(isRuleId, { message: 'Unknown rule ID' }),
-      num(0, 5000, 'ms', { int: true }),
-    ),
+    // Every advice rule needs its own dwell, so the cue gate never falls back to a guessed value (AC 15).
+    dwellMs: z
+      .record(z.string().refine(isRuleId, { message: 'Unknown rule ID' }), num(0, 5000, 'ms', { int: true }))
+      .superRefine((dwell, ctx) => {
+        for (const id of ADVICE_RULE_IDS) {
+          if (!(id in dwell)) ctx.addIssue({ code: 'custom', path: [id], message: 'Missing dwell time for advice rule' });
+        }
+      }),
   }),
   countdownSeconds: num(0, 10, 's', { int: true }),
+  // Cross-field checks (docs/definitions.md): each one rejects a config whose attempt or cycle could never work.
   exercises: z.strictObject({
-    kneeExtension: z.strictObject({
-      targetFlexionAtMostDeg: num(0, 90, 'deg'),
-      toleranceDeg: num(0, 30, 'deg'),
-      holdSeconds: num(0, 60, 's'),
-      reps: num(1, 50, 'reps', { int: true }),
-      startFlexionDeg: num(0, 150, 'deg'),
-      reversalDeg: num(1, 45, 'deg'),
-    }),
-    sitToStand: z.strictObject({
-      reps: num(1, 50, 'reps', { int: true }),
-      riseMs: range(100, 20000, 'ms'),
-      lowerMs: range(100, 20000, 'ms'),
-      standFrac: num(0, 1, 'fraction'),
-      sitFrac: num(0, 1, 'fraction'),
-    }),
-    shoulderRaise: z.strictObject({
-      targetElevationDeg: num(0, 180, 'deg'),
-      toleranceDeg: num(0, 30, 'deg'),
-      reps: num(1, 50, 'reps', { int: true }),
-      leanToleranceDeg: num(0, 45, 'deg'),
-      resetElevationDeg: num(0, 180, 'deg'),
-    }),
+    kneeExtension: z
+      .strictObject({
+        targetFlexionAtMostDeg: num(0, 90, 'deg'),
+        toleranceDeg: num(0, 30, 'deg'),
+        holdSeconds: num(0, 60, 's'),
+        reps: num(1, 50, 'reps', { int: true }),
+        startFlexionDeg: num(0, 150, 'deg'),
+        reversalDeg: num(1, 45, 'deg'),
+      })
+      .refine((k) => k.startFlexionDeg > k.targetFlexionAtMostDeg + k.toleranceDeg, {
+        path: ['startFlexionDeg'],
+        message: 'Must be greater than targetFlexionAtMostDeg + toleranceDeg, or an attempt starts inside the target band',
+      }),
+    sitToStand: z
+      .strictObject({
+        reps: num(1, 50, 'reps', { int: true }),
+        riseMs: range(100, 20000, 'ms'),
+        lowerMs: range(100, 20000, 'ms'),
+        standFrac: num(0, 1, 'fraction'),
+        sitFrac: num(0, 1, 'fraction'),
+      })
+      .refine((s) => s.sitFrac < s.standFrac, {
+        path: ['sitFrac'],
+        message: 'Must be less than standFrac, or seated and standing overlap',
+      }),
+    shoulderRaise: z
+      .strictObject({
+        targetElevationDeg: num(0, 180, 'deg'),
+        toleranceDeg: num(0, 30, 'deg'),
+        reps: num(1, 50, 'reps', { int: true }),
+        leanToleranceDeg: num(0, 45, 'deg'),
+        resetElevationDeg: num(0, 180, 'deg'),
+      })
+      .refine((s) => s.resetElevationDeg < s.targetElevationDeg - s.toleranceDeg, {
+        path: ['resetElevationDeg'],
+        message: 'Must be less than targetElevationDeg − toleranceDeg, or an attempt starts already at the target',
+      }),
   }),
 });
 
