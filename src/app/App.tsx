@@ -13,7 +13,12 @@ export function App() {
     const ctrl = new AbortController();
     loadTargets(ctrl.signal).then(
       (r) => dispatch(r.ok ? { type: 'configLoaded', config: r.config } : { type: 'configFailed', problems: r.problems }),
-      () => {}, // aborted on unmount
+      (e: unknown) => {
+        // An abort on unmount is expected. Anything else fails closed with a message, never a stuck loading screen.
+        if (!ctrl.signal.aborted) {
+          dispatch({ type: 'configFailed', problems: [`Could not load config/targets.json (${String(e)})`] });
+        }
+      },
     );
     return () => ctrl.abort();
   }, []);

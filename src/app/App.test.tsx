@@ -10,9 +10,9 @@ import { App } from './App';
 const defaultConfig = JSON.parse(readFileSync('public/config/targets.json', 'utf8'));
 const EXERCISES = [/seated knee extension/i, /sit-to-stand/i, /shoulder raise/i];
 
-function serveConfig(body: unknown, status = 200) {
+function serveConfig(body: unknown, status = 200, headers?: HeadersInit) {
   const fetchMock = vi.fn(async () =>
-    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }),
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers }),
   );
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -68,6 +68,24 @@ describe('App start-up', () => {
     render(<App />);
     expect(await screen.findByRole('alert')).toHaveTextContent(/targets\.json.*404/);
     expectDisclaimer();
+  });
+
+  it('reports a missing config file when the server falls back to index.html', async () => {
+    // What `vite dev`, `vite preview` and SPA hosts do for a missing file: HTTP 200 with the app page.
+    serveConfig('<!doctype html><html></html>', 200, { 'content-type': 'text/html' });
+    render(<App />);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/targets\.json.*probably missing/);
+    expect(alert).not.toHaveTextContent(/not valid JSON/i);
+    expectDisclaimer();
+  });
+
+  it('reports a response body that fails to arrive, instead of loading forever', async () => {
+    const failing = new Response('{}');
+    vi.spyOn(failing, 'text').mockRejectedValue(new Error('connection reset'));
+    vi.stubGlobal('fetch', vi.fn(async () => failing));
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/targets\.json.*connection reset/);
   });
 
   it('reports malformed JSON', async () => {

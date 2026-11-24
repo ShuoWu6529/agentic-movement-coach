@@ -66,4 +66,17 @@ describe('pose trace schema v1', () => {
     const bad = { ...trace, frames: [{ ...frame(0), lm: [0.5, 0.5] }] };
     expect(PoseTraceSchema.safeParse(bad).success).toBe(false);
   });
+
+  it('rejects half a pose', () => {
+    for (const half of [{ ...frame(0), world: null }, { ...frame(0), lm: null }]) {
+      expect(PoseTraceSchema.safeParse({ ...trace, frames: [half] }).success).toBe(false);
+    }
+  });
+
+  it('rejects timestamps that repeat or go backwards', () => {
+    for (const ts of [[0, 33, 33], [0, 33, 20]]) {
+      const frames = ts.map((t) => ({ t, lm: null, world: null }));
+      expect(PoseTraceSchema.safeParse({ ...trace, frames }).success).toBe(false);
+    }
+  });
 });

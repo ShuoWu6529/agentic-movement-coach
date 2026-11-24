@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { RULES } from '../rules/registry';
 import { canonicalJson, configHash } from './hash';
 import { parseConfig, parseConfigText } from './load';
+import type { TargetsConfig } from './schema';
 
 const text = readFileSync('public/config/targets.json', 'utf8');
 const base = () => JSON.parse(text);
@@ -44,6 +45,28 @@ describe('targets config', () => {
     const c = base();
     c.cues.dwellMs['KE-NOT-A-RULE'] = 100;
     expect(problemsOf(c).join('\n')).toContain('cues.dwellMs');
+  });
+
+  it('requires a dwell time for every advice rule', () => {
+    const c = base();
+    delete c.cues.dwellMs['KE-RANGE-LOW'];
+    expect(problemsOf(c).join('\n')).toMatch(/^cues\.dwellMs\.KE-RANGE-LOW: /m);
+    c.cues.dwellMs = {};
+    const advice = RULES.filter((r) => r.kind === 'advice');
+    expect(problemsOf(c)).toHaveLength(advice.length);
+  });
+
+  it.each([
+    ['knee start angle inside the target band', 'exercises.kneeExtension.startFlexionDeg',
+      (c: TargetsConfig) => { c.exercises.kneeExtension.startFlexionDeg = 15; }], // target 10 + tolerance 5
+    ['sit threshold at or above stand threshold', 'exercises.sitToStand.sitFrac',
+      (c: TargetsConfig) => { c.exercises.sitToStand.sitFrac = 0.85; }], // standFrac 0.85
+    ['shoulder reset at or above the target', 'exercises.shoulderRaise.resetElevationDeg',
+      (c: TargetsConfig) => { c.exercises.shoulderRaise.resetElevationDeg = 80; }], // target 90 − tolerance 10
+  ])('rejects a %s', (_name, path, edit) => {
+    const c = base();
+    edit(c);
+    expect(problemsOf(c).join('\n')).toMatch(new RegExp(`^${path.replaceAll('.', '\\.')}: `, 'm'));
   });
 
   it('rejects an unknown schemaVersion', () => {

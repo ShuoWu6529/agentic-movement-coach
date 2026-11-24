@@ -46,6 +46,15 @@ Which angle is used (image-plane 2D or world 3D) per exercise is chosen from M0.
 - It counts as a repetition when peak elevation reaches the target (`targetElevationDeg` − `toleranceDeg`).
 - Peak elevation below that gives an `insufficient_range` issue. Lean beyond `leanToleranceDeg` from the calibrated baseline at any time in the attempt gives a `trunk_lean` issue.
 
+### Config consistency
+
+The config loader rejects values that would make these definitions impossible:
+
+- `startFlexionDeg` must be greater than `targetFlexionAtMostDeg` + `toleranceDeg`.
+- `sitFrac` must be less than `standFrac`.
+- `resetElevationDeg` must be less than `targetElevationDeg` − `toleranceDeg`.
+- `cues.dwellMs` must have an entry for every `advice` rule.
+
 ## Best angle
 
 Peak extension (smallest flexion) for the knee, peak elevation for the shoulder **(confirm)**.
