@@ -1,0 +1,50 @@
+{
+  "name": "agentic-movement-coach",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "AI Movement Coach pilot: browser app with on-device pose tracking. Experimental, not clinically validated.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "fetch-models": "node scripts/fetch-models.mjs",
+    "predev": "npm run fetch-models",
+    "dev": "vite",
+    "dev:https": "npm run fetch-models && vite --mode https",
+    "prebuild": "npm run fetch-models",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:data": "node scripts/check-data-untracked.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@testing-library/jest-dom": "8.0.0",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.13",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.8",
+    "globals": "17.14.0",
+    "jsdom": "31.0.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vite": "8.3.8",
+    "vitest": "5.1.1"
+  }
+}
