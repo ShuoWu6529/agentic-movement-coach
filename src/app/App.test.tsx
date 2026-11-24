@@ -1,0 +1,78 @@
+// M0 exit behavior (SPEC 8.8): opening the app loads the therapist config and shows the
+// exercise list with the disclaimer. Also the load step of 8.6: a missing or invalid config
+// names the problem and offers no way to start (AC 15), with the disclaimer still visible (AC 7).
+
+import { readFileSync } from 'node:fs';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { App } from './App';
+
+const defaultConfig = JSON.parse(readFileSync('public/config/targets.json', 'utf8'));
+const EXERCISES = [/seated knee extension/i, /sit-to-stand/i, /shoulder raise/i];
+
+function serveConfig(body: unknown, status = 200) {
+  const fetchMock = vi.fn(async () =>
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function expectDisclaimer() {
+  const note = screen.getByRole('note', { name: /disclaimer/i });
+  expect(note).toHaveTextContent(/experimental/i);
+  expect(note).toHaveTextContent(/not clinically validated/i);
+  expect(note).toHaveTextContent(/does not diagnose or prescribe/i);
+}
+
+describe('App start-up', () => {
+  it('loads the therapist config and shows the three exercises with the disclaimer', async () => {
+    const fetchMock = serveConfig(defaultConfig);
+    render(<App />);
+
+    expectDisclaimer(); // already visible while the config loads
+
+    for (const name of EXERCISES) {
+      expect(await screen.findByRole('button', { name })).toBeInTheDocument();
+    }
+    expectDisclaimer();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toMatch(/config\/targets\.json$/);
+    expect(init).toMatchObject({ cache: 'no-store' });
+  });
+
+  it('names the field at fault and offers no exercise when a value is out of range', async () => {
+    const bad = structuredClone(defaultConfig);
+    bad.exercises.kneeExtension.holdSeconds = -1;
+    serveConfig(bad);
+    render(<App />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('exercises.kneeExtension.holdSeconds');
+    for (const name of EXERCISES) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    expectDisclaimer();
+  });
+
+  it('rejects an unknown schemaVersion', async () => {
+    serveConfig({ ...defaultConfig, schemaVersion: 2 });
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('schemaVersion');
+  });
+
+  it('reports a missing config file', async () => {
+    serveConfig('not found', 404);
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/targets\.json.*404/);
+    expectDisclaimer();
+  });
+
+  it('reports malformed JSON', async () => {
+    serveConfig('{ "schemaVersion": 1,');
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not valid JSON/i);
+  });
+});

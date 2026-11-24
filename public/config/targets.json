@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "configVersion": "0.1-dev",
+  "tracking": {
+    "minVisibility": 0.5,
+    "boundsMargin": 0.02,
+    "unreliableAfterMs": 300,
+    "recoverAfterMs": 1000,
+    "minFps": 12
+  },
+  "framing": { "stableMs": 1000, "minLuma": 40 },
+  "calibration": { "durationMs": 2000, "maxMotion": 0.02 },
+  "smoothing": { "kind": "ema", "alpha": 0.5 },
+  "cues": {
+    "displayMs": 2500,
+    "cooldownMs": 3000,
+    "dwellMs": {
+      "KE-RANGE-LOW": 300,
+      "KE-HOLD-BREAK": 200,
+      "STS-RISE-FAST": 0,
+      "STS-RISE-SLOW": 0,
+      "STS-LOWER-FAST": 0,
+      "STS-LOWER-SLOW": 0,
+      "SR-RANGE-LOW": 300,
+      "SR-LEAN": 300
+    }
+  },
+  "countdownSeconds": 3,
+  "exercises": {
+    "kneeExtension": {
+      "targetFlexionAtMostDeg": 10,
+      "toleranceDeg": 5,
+      "holdSeconds": 3,
+      "reps": 10,
+      "startFlexionDeg": 60,
+      "reversalDeg": 10
+    },
+    "sitToStand": {
+      "reps": 5,
+      "riseMs": [1000, 3000],
+      "lowerMs": [1500, 4000],
+      "standFrac": 0.85,
+      "sitFrac": 0.2
+    },
+    "shoulderRaise": {
+      "targetElevationDeg": 90,
+      "toleranceDeg": 10,
+      "reps": 10,
+      "leanToleranceDeg": 10,
+      "resetElevationDeg": 30
+    }
+  }
+}
