@@ -18,7 +18,7 @@ Worked examples:
 - `targetElevationDeg: 90`, `toleranceDeg: 10`. An arm that reaches 82° meets the target (within 90 − 10). At 75° it does not.
 - `leanToleranceDeg: 10`. A patient who sits with 4° of tilt at calibration and leans to 15° during a raise has leaned 11° from baseline, which is beyond tolerance.
 
-Which angle is used (image-plane 2D or world 3D) per exercise is chosen from M0.5 and live testing (PLANS.md §10).
+Which angle is used (image-plane 2D or world 3D) per exercise is chosen from live testing in M1–M3 (PLANS.md §10).
 
 ## Attempt and repetition
 
