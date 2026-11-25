@@ -1,4 +1,4 @@
-// Phase machine (SPEC 8.6). M0 covers loading → select, plus the blocking config-error state.
+// Phase machine (PLANS.md §6). M0 covers loading → select, plus the blocking config-error state.
 // permission, framing, calibration, countdown, active, trackingLost and summary arrive in M1.
 
 import type { TargetsConfig } from '../../core/config/schema';

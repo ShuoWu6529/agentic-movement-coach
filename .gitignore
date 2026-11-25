@@ -3,7 +3,7 @@ dist/
 coverage/
 *.log
 
-# Fetched by scripts/fetch-models.mjs, not committed (SPEC 8.1)
+# Fetched by scripts/fetch-models.mjs, not committed (PLANS.md §1)
 public/models/
 public/wasm/
 

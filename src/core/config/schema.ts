@@ -1,4 +1,4 @@
-// Targets config schema (R-F3, SPEC 8.5). zod is the single source of truth: the JSON loader,
+// Targets config schema (R-F3, PLANS.md §5). zod is the single source of truth: the JSON loader,
 // and later the settings form (M4), read min, max and unit from here. Every threshold is config (R-E9).
 // Ranges are sanity bounds to catch typos, not clinical limits.
 

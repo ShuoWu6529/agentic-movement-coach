@@ -1,4 +1,4 @@
-// Config hash for session logs and the threshold-freeze lock (R-E9, 8.7).
+// Config hash for session logs and the threshold-freeze lock (R-E9, PLANS.md §7).
 // sha256 over canonical JSON (keys sorted at every level), so key order and whitespace don't matter.
 
 export function canonicalJson(value: unknown): string {

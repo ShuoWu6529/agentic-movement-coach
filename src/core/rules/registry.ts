@@ -1,7 +1,7 @@
-// Draft rule registry (R-F4, SPEC 8.5). Rule IDs and categories are the vocabulary of the therapist's
-// labels and of feedback scoring, so they settle before M7 (8.10). Texts are drafts: neutral and
+// Draft rule registry (R-F4, PLANS.md §5). Rule IDs and categories are the vocabulary of the therapist's
+// labels and of feedback scoring, so they settle before M7 (PLANS.md §10). Texts are drafts: neutral and
 // encouraging (R-S3), and they never diagnose or touch the therapist's targets (R-S2).
-// A therapist read-through of every text is still to come (8.9).
+// A therapist read-through of every text is still to come (PLANS.md §9).
 
 import type { ExerciseId } from '../types';
 

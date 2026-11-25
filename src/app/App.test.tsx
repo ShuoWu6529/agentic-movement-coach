@@ -1,5 +1,5 @@
-// M0 exit behavior (SPEC 8.8): opening the app loads the therapist config and shows the
-// exercise list with the disclaimer. Also the load step of 8.6: a missing or invalid config
+// M0 exit behavior (PLANS.md §8): opening the app loads the therapist config and shows the
+// exercise list with the disclaimer. Also the load step of PLANS.md §6: a missing or invalid config
 // names the problem and offers no way to start (AC 15), with the disclaimer still visible (AC 7).
 
 import { readFileSync } from 'node:fs';
