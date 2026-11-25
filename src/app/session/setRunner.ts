@@ -98,16 +98,17 @@ export class SetRunner {
 
   private onFrame(f: PoseFrame, real: boolean): void {
     if (this.finished || this.stopped) return;
-    if (real) {
-      this.watchdog?.seen(f.t);
-      if (this.source.info.kind === 'camera') this.traceFrames.push({ t: f.t, lm: f.lm ? [...f.lm] : null, world: f.world ? [...f.world] : null });
-    }
+    if (real) this.watchdog?.seen(f.t);
     const snap = stepWithAutoAdvance(this.session, f, this.auto);
     if (!snap) return;
+    // The exported trace holds exactly the frames the session processed, including the watchdog's
+    // "no pose" frames, so replaying it reproduces the live session's gating and counts.
+    if (this.source.info.kind === 'camera') this.traceFrames.push({ t: f.t, lm: f.lm ? [...f.lm] : null, world: f.world ? [...f.world] : null });
     if (this.ctx) drawPose(this.ctx, snap.lm, this.source.info.size, this.joints, snap.gate.ok);
     const commit = snap.commit;
     const now = this.source.now;
-    if (commit && now) nextFrame(() => this.session.markCueShown(commit.seq, now()));
+    // Only a cue that is published to the display gets a display time (R-F11).
+    if (commit && now && this.session.phase !== 'summary') nextFrame(() => this.session.markCueShown(commit.seq, now()));
     this.afterChange(snap);
   }
 

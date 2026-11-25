@@ -77,6 +77,8 @@ Every cue passes through one cue gate (PLANS.md §2). A condition must hold for 
 | `KE-HOLD-BREAK` | advice | From the frame a running hold breaks, until the knee re-enters the band, the hold completes, or the next attempt starts | The attempt whose hold broke |
 | `KE-HOLD-DONE` | positive | The frame a hold completes and the repetition is counted (an event, no dwell) | The counted attempt |
 
+A cue that would commit on the frame that completes the last repetition is not shown or logged, because the summary replaces the set screen on that frame. So the final `KE-HOLD-DONE` of a completed set has no cue event.
+
 `KE-RANGE-LOW` is tied to the end of the attempt on purpose: it never fires during an attempt that later reaches the target, so per-attempt scoring (O-8) is not penalized for a patient who is still moving. Its feedback delay therefore includes the configured dwell.
 
 ## Best angle
@@ -116,7 +118,7 @@ Each `cue` event in the session log records three times (PLANS.md §5), all in m
 - `confirmT`: the frame in which its dwell time (`cues.dwellMs[ruleId]`) was met.
 - `shownAt`: the next animation frame after the cue was committed for display.
 
-In a live session, `shownAt` is the frame-clock time of the first animation frame after the commit. For a session replayed from a pose trace (`device.clock: 'trace'`) there is no display clock, so `shownAt` equals `confirmT`; delay is not measured from replays (PLANS.md §7).
+In a live session, `shownAt` is the frame-clock time of the first animation frame after the commit. Only cues published to the display get one. For a session replayed from a pose trace (`device.clock: 'trace'`) there is no display clock, so `shownAt` equals `confirmT`; delay is not measured from replays (PLANS.md §7).
 
 **Feedback delay** is `shownAt − onsetT`. The report also gives `shownAt − confirmT`. The O-2 target is a median of 300 ms or less, with the worst case reported. Delay is measured in live sessions on target devices, not in replay (PLANS.md §7).
 

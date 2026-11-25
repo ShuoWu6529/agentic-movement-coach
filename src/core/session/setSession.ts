@@ -206,7 +206,10 @@ export class SetSession {
     }
 
     const lost = this.phaseNow === 'trackingLost';
-    const open = this.phaseNow === 'active' && gate.ok && flexion !== null;
+    // The frame that completes the last repetition ends the set: the summary replaces the set screen
+    // at once, so no cue is committed on it (a cue that never reaches the display is not logged).
+    const finishing = this.phaseNow === 'active' && this.engine.reps >= this.cfg.exercises.kneeExtension.reps;
+    const open = this.phaseNow === 'active' && gate.ok && flexion !== null && !finishing;
     const out = this.cueGate.step(t, {
       open,
       conditions: open ? this.engine.conditions() : [],
@@ -231,7 +234,7 @@ export class SetSession {
       rep: this.engine.reps,
     });
 
-    if (this.phaseNow === 'active' && this.engine.reps >= this.cfg.exercises.kneeExtension.reps) this.finish(t);
+    if (finishing) this.finish(t);
 
     const hold = this.phaseNow === 'active' ? this.engine.holdRemainingMs() : null;
     this.last = {

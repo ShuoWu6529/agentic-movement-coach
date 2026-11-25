@@ -213,6 +213,15 @@ describe('set session on synthetic traces', () => {
     expect(log.frames.find((f) => f.t === cue.confirmT)?.cue).toBe(cue.ruleId);
   });
 
+  it('commits no cue on the frame that completes the last repetition, since the summary replaces the screen', () => {
+    const { log, result } = run(trace([...SETTLE, ...extension(5, 3500), ...extension(5, 3500)]), withKnee({ reps: 2 }));
+    expect(result.summary.reps).toBe(2);
+    const done = cueEvents(log).filter((c) => c.ruleId === 'KE-HOLD-DONE');
+    expect(done.map((c) => c.attemptIndex)).toEqual([0]);
+    expect(log.frames.at(-1)).toMatchObject({ rep: 2, cue: null });
+    expect(logInvariantProblems(log)).toEqual([]);
+  });
+
   it('lets the display adapter record when a cue reached the screen', () => {
     const t = trace([...SETTLE, ...extension(25, 1500)]);
     const s = new SetSession({ config, side: 'left', video: t.video });
