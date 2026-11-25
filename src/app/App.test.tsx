@@ -9,6 +9,7 @@ import { App } from './App';
 
 const defaultConfig = JSON.parse(readFileSync('public/config/targets.json', 'utf8'));
 const EXERCISES = [/seated knee extension/i, /sit-to-stand/i, /shoulder raise/i];
+const BUTTONS = [/seated knee extension, left leg/i, /seated knee extension, right leg/i, /sit-to-stand/i, /shoulder raise/i];
 
 function serveConfig(body: unknown, status = 200, headers?: HeadersInit) {
   const fetchMock = vi.fn(async () =>
@@ -32,9 +33,12 @@ describe('App start-up', () => {
 
     expectDisclaimer(); // already visible while the config loads
 
-    for (const name of EXERCISES) {
+    for (const name of BUTTONS) {
       expect(await screen.findByRole('button', { name })).toBeInTheDocument();
     }
+    for (const name of EXERCISES) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    // Knee extension is built (M1); the other two follow in M2 and M3 (SPEC 4.1 build order).
+    expect(screen.getByRole('button', { name: /seated knee extension, left leg/i })).toBeEnabled();
     expectDisclaimer();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -51,7 +55,7 @@ describe('App start-up', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('exercises.kneeExtension.holdSeconds');
-    for (const name of EXERCISES) {
+    for (const name of BUTTONS) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
     expectDisclaimer();

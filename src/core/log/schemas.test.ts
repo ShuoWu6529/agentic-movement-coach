@@ -8,7 +8,7 @@ const config = JSON.parse(readFileSync('public/config/targets.json', 'utf8'));
 
 async function minimalLog() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     app: { version: '0.0.0', gitSha: 'abc1234' },
     config: { hash: await configHash(config), value: config },
     exercise: 'kneeExtension',
@@ -22,7 +22,7 @@ async function minimalLog() {
     ],
     events: [
       { type: 'phase', t: 0, phase: 'active' },
-      { type: 'attempt', t: 20, index: 0, counted: false, peak: 22, holdMs: 0, issues: ['insufficient_range'] },
+      { type: 'attempt', t: 20, tStart: 5, index: 0, counted: false, peak: 22, holdMs: 0, issues: ['insufficient_range'] },
       { type: 'cue', ruleId: 'KE-RANGE-LOW', attemptIndex: 0, onsetT: 10, confirmT: 15, shownAt: 18 },
       { type: 'tracking_lost', t: 33, firstBadT: 33 },
       { type: 'tracking_recovered', t: 66 },
@@ -31,14 +31,15 @@ async function minimalLog() {
   };
 }
 
-describe('session log schema v1', () => {
+describe('session log schema v2', () => {
   it('accepts a minimal log with every event type', async () => {
     expect(SessionLogSchema.safeParse(await minimalLog()).success).toBe(true);
   });
 
   it('rejects an unknown schemaVersion and a missing observer note', async () => {
     const log = await minimalLog();
-    expect(SessionLogSchema.safeParse({ ...log, schemaVersion: 2 }).success).toBe(false);
+    expect(SessionLogSchema.safeParse({ ...log, schemaVersion: 1 }).success).toBe(false);
+    expect(SessionLogSchema.safeParse({ ...log, schemaVersion: 3 }).success).toBe(false);
     const noNote: Partial<typeof log> = { ...log };
     delete noNote.observerNote;
     expect(SessionLogSchema.safeParse(noNote).success).toBe(false);

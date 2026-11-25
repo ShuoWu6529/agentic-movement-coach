@@ -10,22 +10,56 @@ The plan was reviewed against SPEC sections 3–7 before scaffolding, and the ch
 |---|---|---|
 | M0 Scaffold and definitions | **Done** | PR #3 (scaffold) and PR #4 (review fixes) merged. CI is green on `main`. 29 Vitest tests. Headless Chromium shows the exercise list and disclaimer from `npm run dev` after a clean `npm ci` and from a production build served at a subpath. |
 | M0.5 Tracking-reliability spike | **Deferred** (2026-11-24) | Deferred by the owner, who can't record the takes now. Its gate measurement moves to M5 and must pass before M7 (see M0.5 in §8). The capture page and analyzer are in `spike/`, kept local by decision (not committed). On 2026-11-24 the analyzer was changed to require a pass in every device / variant / delegate group, not only pooled, and to report missing scenarios per group. The spike's model download now checks the same sha256 pins as `scripts/fetch-models.mjs`. 11 analyzer tests pass on synthetic takes and the spike builds cleanly. A headless fake-camera smoke test passed earlier. No takes of a real person have been recorded, so there is no result yet. |
-| M1–M8 | Not started | |
+| M1 Seated knee extension | **Built; manual device checks pending** (2026-11-24) | Core (`src/core`: gate, framing with side check, calibration, knee engine, cue gate, `SetSession`, summary, log build and invariants), browser edges (`src/pose`: async `PoseEngine`, `CameraSource`, `TraceSource`, watchdog), app shell (phase reducer, `SetRunner`, screens, summary and export). 108 Vitest tests, including the randomized no-cue-on-unreliable-frame test, run on synthetic traces (`fixtures/synthetic/`). 3 Playwright tests (fake-camera smoke, permission denied, log download) pass on the production build and are in CI. Not done: the owner's manual checks in **Owner to-do: close M1** below. M1 is not Done until they pass. |
+| M2–M8 | Not started | |
 
-**Next milestone: M1.** M0.5 is deferred, so the reliability gate is built on an unmeasured signal. The M0.5 section in §8 says what moved where. Settled on 2026-11-24:
+### Owner to-do: close M1
+
+These need a person and real devices, so they could not be done in the build. Run them with the camera, not a trace replay. Tick each box and note the device and browser. When all of them pass, change M1 to **Done** in the table above.
+
+Setup: `npm ci`, then `npm run dev` on the laptop, or `npm run dev:https` for the phone (open the LAN address and accept the self-signed certificate). For a live check, download the session log from **Research export** on the summary.
+
+- [ ] **Laptop set (M1 exit).** Complete one full knee-extension set on a laptop webcam. You reach the summary, and the downloaded session log is valid JSON.
+- [ ] **Phone set (M1 exit).** Complete one full set on a phone over `dev:https`. You reach the summary, and the log downloads.
+- [ ] **Permission prompts (AC 2).** In Chrome and in Safari: allow access, and separately deny it. The app should say access was denied and how to allow it, with no Start button.
+- [ ] **Overlay (AC 5).** The skeleton lines up with your body. The preview is mirrored like a mirror, and choosing the left leg tracks your actual left leg.
+- [ ] **Cover the camera mid-set (AC 16, 17).** Within about 1 second the cue clears and "Can't see you well" appears. Uncover it, press Resume, and check that completed reps were kept and no rep was counted while covered.
+- [ ] **Config reload (AC 14, 15).** Edit `public/config/targets.json` (for example `holdSeconds` or `reps`) and reload, under both `npm run dev` and `npm run preview` (after `npm run build`). The new value takes effect. Then break the file on purpose: the app shows the config error and offers no way to start.
+- [ ] **Clock per device.** In each log, note `device.clock` (`captureTime` or `callback`) and record it here next to the device.
+
+Not blocking M1, but needing your call:
+
+- [ ] Confirm or change the **Decisions made in M1** listed below.
+- [ ] Update SPEC O-5 to record that team members may record themselves (see the O-5 bullet below).
+
+**Next: the owner to-do above, then M2.** M0.5 is deferred, so the reliability gate is built on an unmeasured signal. The M0.5 section in §8 says what moved where. Settled on 2026-11-24:
 
 - M0.5 is deferred, not dropped. Its pass criteria are measured on real app traces in M5, and must pass before M7.
 - O-5: the owner confirmed that team members may record themselves, both for the spike and for the traces exported during M1–M5 manual checks. Volunteer recording is still gated. SPEC.md still lists this question under O-5 and needs the owner's update.
 - `spike/` stays local and is not committed. Its takes stay out of git (`spike/.gitignore`).
 
-**Versions recorded at scaffold:** Node 24.16 and npm 11.13 (CI uses Node 24), React 19.3, Vite 8.3, Vitest 5.1, zod 4.6, `@mediapipe/tasks-vision` 1.2.3. TypeScript is pinned to 6.0.x because typescript-eslint supports versions below 6.1 only.
+**Versions recorded at scaffold:** Node 24.16 and npm 11.13 (CI uses Node 24), React 19.3, Vite 8.3, Vitest 5.1, zod 4.6, `@mediapipe/tasks-vision` 1.2.3. TypeScript is pinned to 6.0.x because typescript-eslint supports versions below 6.1 only. Added in M1: `@playwright/test` 1.65.1 (Chromium build 1255). The permission-denied test uses full Chromium in headless mode (`channel: 'chromium'`), because the headless shell answers every camera prompt with `NotSupportedError`.
+
+**Decisions made in M1** (owner to confirm; each is recorded where it applies):
+
+- **Session log v2** (§5): `attempt` events carry `tStart`, so scoring can align attempts by time overlap, and `device.clock` gains `'trace'` for sessions replayed from a pose trace. No v1 log was ever recorded.
+- **Knee attempt end** (`docs/definitions.md`): the `reversalDeg` end applies only outside the target band. Otherwise a patient who over-reaches and settles back into the band would end the attempt mid-hold.
+- **Watchdog stall threshold:** no frame for 2 × 1000 / `tracking.minFps` ms of wall time. It is derived from existing config, so the config shape is unchanged.
+- **Knee cue conditions** (`docs/definitions.md`): `KE-RANGE-LOW` fires when an attempt ends short of the band; `KE-HOLD-BREAK` fires live when a hold breaks; `KE-HOLD-DONE` fires when a repetition counts.
+- **In-app trace replay** (research): a pose trace file can be replayed through the set from the exercise screen, with Start and Resume pressed automatically. The Playwright log test uses it.
+- **Primary knee angle:** image-plane (2D) for the side view; the world-landmark angle is logged as `kneeFlexion3d` for the M1–M3 comparison (§10).
+
+**Open points found in M1:**
+
+1. With the draft `cues.dwellMs['KE-RANGE-LOW']` of 300 ms, the delay from onset to display is at least 300 ms by construction, so the O-2 median target (300 ms or less) cannot be met for that cue. The dwell is a config value to tune on development data (O-7). The latency definition (from `onsetT`) is unchanged.
+2. ~~SPEC R-E5 and O-8 said feedback is scored "per repetition".~~ Resolved on 2026-11-24: the owner approved per-attempt scoring, and SPEC R-E5 and O-8 now say per attempt.
 
 **Open decisions carried from M0.** These need the owner's call. They are not yet reflected in the sections below.
 
-1. The clock-free core, async `PoseEngine` and `FrameSource` boundary are listed in §10 as settled by M0, but none of them exist yet. Proposal: make them the first step of M1.
+1. ~~The clock-free core, async `PoseEngine` and `FrameSource` boundary did not exist after M0.~~ Built as the first step of M1.
 2. Proposed plan edits from PR #3:
-   - In §1, record CI staging: Playwright from M1, pytest from M6.
-   - Record the versions above.
+   - ~~In §1, record CI staging: Playwright from M1, pytest from M6.~~ Playwright is in CI from M1.
+   - ~~Record the versions above.~~
    - In §5, add the `exercise` field that the rule registry already carries.
 3. `docs/definitions.md` items marked **(confirm)** need therapist review (O-4). These include the attempt start and end thresholds, hold-break handling, and the alignment tolerance for scoring.
 4. The pose trace rejects repeated frame timestamps (`t` must strictly increase). Revisit if replay needs repeats.
@@ -101,12 +135,12 @@ Three formats are long-lived: the session log, the pose trace and the targets co
 
 ```ts
 interface SessionLog {
-  schemaVersion: 1;
+  schemaVersion: 2;                                  // v2 since M1: attempt tStart, clock 'trace'
   app: { version: string; gitSha: string };
   config: { hash: string; value: TargetsConfig };   // the full effective config
   exercise: 'kneeExtension' | 'sitToStand' | 'shoulderRaise';
   side?: 'left' | 'right';                           // anatomical, not mirrored
-  device: { userAgent: string; camera: { w: number; h: number; fps: number }; clock: 'captureTime' | 'callback' };
+  device: { userAgent: string; camera: { w: number; h: number; fps: number }; clock: 'captureTime' | 'callback' | 'trace' };
   model: { variant: 'full' | 'lite'; delegate: 'GPU' | 'CPU' };
   calibration: { t: number; baseline: Record<string, number> };
   frames: FrameRow[];
@@ -124,7 +158,7 @@ interface FrameRow {
 }
 type LogEvent =
   | { type: 'phase'; t: number; phase: string }
-  | { type: 'attempt'; t: number; index: number; counted: boolean; peak: number;
+  | { type: 'attempt'; t: number; tStart: number; index: number; counted: boolean; peak: number;
       holdMs?: number; riseMs?: number; lowerMs?: number; issues: string[] }
   | { type: 'cue'; ruleId: string; attemptIndex: number | null; onsetT: number; confirmT: number; shownAt: number }
   | { type: 'tracking_lost'; t: number; firstBadT: number }
@@ -133,7 +167,8 @@ type LogEvent =
 
 - An **attempt** is one movement cycle, whether or not it counts as a repetition. A knee extension that never reaches the target is an attempt with `counted: false` and an insufficient-range issue. Therapist labels and feedback scoring (O-8) use attempts.
 - **Cue timing:** `onsetT` is the frame in which the rule's condition first became true, `confirmT` the frame in which its dwell time was met, and `shownAt` the next animation frame after the cue was committed. The report gives the delay from onset and from confirmation (AC 21).
-- **Timestamps:** `t` uses the `requestVideoFrameCallback` `captureTime` where the browser provides it, and the callback time otherwise. `device.clock` records which.
+- **Timestamps:** `t` uses the `requestVideoFrameCallback` `captureTime` where the browser provides it, and the callback time otherwise. `device.clock` records which, or `'trace'` for a session replayed from a pose trace.
+- **Angles:** knee extension logs `kneeFlexion` (image-plane, primary) and `kneeFlexion3d` (world landmarks), both null on unreliable frames.
 
 **Pose trace.** One format for recorded landmark sequences, used by `TraceSource`, tests, fixtures and offline replay. It holds `schemaVersion`, the model variant and delegate, the video size and, per frame, `t` plus 33 image landmarks (x, y, z, visibility, presence) and 33 world landmarks (x, y, z), or null when no pose was found. It can be exported next to the session log for research use.
 
@@ -431,14 +466,14 @@ Requirements without a numbered criterion:
 
 | Decision | What depends on it | Settle by |
 |---|---|---|
-| Session log schema | Scoring script, every recorded session | End of M1; no breaking changes after M7 starts |
+| Session log schema | Scoring script, every recorded session | End of M1 (v2); no breaking changes after M7 starts |
 | Pose trace format | Fixtures, replay, spike traces | M0 (drafted from M0.5) |
 | Attempt and repetition definitions, hold break, sit-to-stand cycle | Manual counts, labels, scoring | `docs/definitions.md`, before M7 |
 | Rule IDs and issue categories | Therapist labels, precision and recall | Before M7 |
 | Angle conventions and config field names | Config, form, logs, goniometer comparison | M0 |
 | Primary angle per exercise (image-plane 2D or world 3D) | Exercise engines | First choice from M1–M3 live testing (M0.5 deferred); development data only confirms or changes it |
 | Latency definition (onset, confirmation, shown) | AC 21, report | M0 |
-| Pure clock-free core, async `PoseEngine`, `FrameSource` boundary | Testability, performance | M0 (not yet built; see open decision 1 in Status) |
+| Pure clock-free core, async `PoseEngine`, `FrameSource` boundary | Testability, performance | Built in M1 |
 | Config shape and versioning | JSON file, form, logs | M0 (values stay tunable) |
 | Freeze lock (config hash plus git commit) | Credibility of the test results | M7; it cannot be added credibly after test data has been seen |
 | Self-hosted assets and `BASE_URL` | Hosting (O-12) | M0 |

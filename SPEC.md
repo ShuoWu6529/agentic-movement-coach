@@ -72,7 +72,7 @@ Build order: R-EX1, then R-EX2, then R-EX3. Each must work end to end before the
 - **R-E3 Angle accuracy.** Compare app joint angles with independent reference measurements taken with a goniometer or inclinometer at held poses (a few reference points per set, not every frame).
 - **R-E9 Threshold discipline.** All rule thresholds (tracking confidence, hold tolerance, lean tolerance, tempo bounds, repetition definitions) live in the config, are tuned on development recordings only, and are frozen and versioned before the test set is scored.
 - **R-E4 Count accuracy.** Compare repetition counts with manual counts.
-- **R-E5 Feedback quality.** Compare the app's feedback with a physical therapist's assessment of the same sets; compute precision and recall per repetition. The therapist labels which issues (e.g. insufficient range, trunk lean, too fast) occurred in each repetition; a true positive is an app cue matching a therapist-labeled issue in that repetition.
+- **R-E5 Feedback quality.** Compare the app's feedback with a physical therapist's assessment of the same sets; compute precision and recall per attempt. An attempt is one movement cycle, whether or not it counts as a repetition (`docs/definitions.md`). The therapist labels which issues (e.g. insufficient range, trunk lean, too fast) occurred in each attempt; a true positive is an app cue matching a therapist-labeled issue in that attempt.
 - **R-E6 Robustness.** Test at least two lighting conditions and at least two camera positions.
 - **R-E7 Failure reporting.** Report errors, incorrect feedback, and tracking failures, including those that did not meet the targets.
 - **R-E8 Scoring tool.** An offline script computes angle error, count accuracy, feedback precision and recall, and feedback delay from labeled videos and session logs.
@@ -179,7 +179,7 @@ Each criterion is checked by observing the running app, the exported data, or th
 | O-3 | Independent angle reference | Goniometer or inclinometer readings at held poses. Who takes the measurements is still open (see O-4). |
 | O-6 | Pose model variant | MediaPipe "full" by default, falling back to "lite" on slow devices, with the variant logged. Minimum device spec to be recorded after first device tests. |
 | O-7 | Rule definitions and thresholds | Defaults live in the config, are tuned on development recordings only, then frozen and versioned before the test set is scored. The specific values are set during the build. |
-| O-8 | Feedback scoring unit | Per repetition: the therapist labels issues in each repetition, and app cues are matched against those labels. |
+| O-8 | Feedback scoring unit | Per attempt: the therapist labels issues in each attempt (one movement cycle, counted or not), and app cues are matched against those labels. Changed from "per repetition" on 2026-11-24, because an attempt that never reaches the target is not a repetition, so its insufficient-range issue could not be scored per repetition. |
 | O-9 | Tech stack | React + Vite (TypeScript) web app; Python offline scoring script. Hosting is not chosen; any static host works since there is no backend. |
 | O-10 | Target entry | JSON config plus a simple in-app settings form. |
 | O-11 | Knee-extension set | One leg per set, side chosen by the patient. |

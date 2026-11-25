@@ -9,3 +9,7 @@ public/wasm/
 
 # Videos, traces, raw logs and consent records stay out of git (C-4)
 data/
+
+# Playwright output
+test-results/
+playwright-report/

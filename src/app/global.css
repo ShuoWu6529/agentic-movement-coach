@@ -9,6 +9,8 @@
   --note-fg: #4a3b00;
   --error-bg: #fdecec;
   --error-line: #e0a3a3;
+  --accent: #1f5f8b;
+  --accent-fg: #ffffff;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg);
   color: var(--fg);
@@ -24,6 +26,8 @@
     --note-fg: #f1e3a8;
     --error-bg: #3a1e1e;
     --error-line: #7a3b3b;
+    --accent: #7fc4f0;
+    --accent-fg: #0c1a24;
   }
 }
 body {

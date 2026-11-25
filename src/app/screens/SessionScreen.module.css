@@ -1,0 +1,132 @@
+.panel {
+  display: grid;
+  gap: 0.75rem;
+}
+.heading {
+  font-size: 1.25rem;
+  margin: 0;
+}
+.session {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 52rem) {
+  .session {
+    grid-template-columns: minmax(0, 3fr) minmax(16rem, 2fr);
+    align-items: start;
+  }
+}
+.stage {
+  position: relative;
+  width: 100%;
+  background: #111;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+/* Mirror the preview and the overlay together; the data stays unmirrored (PLANS.md §2). */
+.mirrored video,
+.mirrored .overlay {
+  transform: scaleX(-1);
+}
+.stage video,
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.stage video {
+  object-fit: cover;
+}
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 6rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 60%);
+}
+.hud {
+  display: grid;
+  gap: 0.75rem;
+}
+.message {
+  margin: 0;
+  font-size: 1.1rem;
+  min-height: 3em;
+}
+.counter {
+  margin: 0;
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.counterOf {
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+}
+.readouts dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.readouts dd {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cue {
+  margin: 0;
+  min-height: 3.2em;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 1.15rem;
+}
+.positive {
+  border-color: var(--accent);
+}
+.lost {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--note-bg);
+  color: var(--note-fg);
+  font-size: 1.1rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.primary,
+.secondary {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1.2rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.secondary {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: inherit;
+}
