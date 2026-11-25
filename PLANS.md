@@ -9,13 +9,14 @@ The plan was reviewed against SPEC sections 3–7 before scaffolding, and the ch
 | Milestone | State | Evidence |
 |---|---|---|
 | M0 Scaffold and definitions | **Done** | PR #3 (scaffold) and PR #4 (review fixes) merged. CI is green on `main`. 29 Vitest tests. Headless Chromium shows the exercise list and disclaimer from `npm run dev` after a clean `npm ci` and from a production build served at a subpath. |
-| M0.5 Tracking-reliability spike | **Tooling built, not run** | The capture page and analyzer are in `spike/`, which is not committed. 8 analyzer tests pass on synthetic takes, and a headless fake-camera smoke test passes. No takes of a real person have been recorded, so there is no result yet. |
+| M0.5 Tracking-reliability spike | **Deferred** (2026-11-24) | Deferred by the owner, who can't record the takes now. Its gate measurement moves to M5 and must pass before M7 (see M0.5 in §8). The capture page and analyzer are in `spike/`, kept local by decision (not committed). On 2026-11-24 the analyzer was changed to require a pass in every device / variant / delegate group, not only pooled, and to report missing scenarios per group. The spike's model download now checks the same sha256 pins as `scripts/fetch-models.mjs`. 11 analyzer tests pass on synthetic takes and the spike builds cleanly. A headless fake-camera smoke test passed earlier. No takes of a real person have been recorded, so there is no result yet. |
 | M1–M8 | Not started | |
 
-**Next milestone: M0.5.** Record the eight scenarios on a laptop and a phone with both model variants, then run the analyzer against the pass criteria (§8). Two things are needed first:
+**Next milestone: M1.** M0.5 is deferred, so the reliability gate is built on an unmeasured signal. The M0.5 section in §8 says what moved where. Settled on 2026-11-24:
 
-- O-5 confirmation that team members recording themselves for the spike is allowed.
-- A decision on whether `spike/` is committed or stays local.
+- M0.5 is deferred, not dropped. Its pass criteria are measured on real app traces in M5, and must pass before M7.
+- O-5: the owner confirmed that team members may record themselves, both for the spike and for the traces exported during M1–M5 manual checks. Volunteer recording is still gated. SPEC.md still lists this question under O-5 and needs the owner's update.
+- `spike/` stays local and is not committed. Its takes stay out of git (`spike/.gitignore`).
 
 **Versions recorded at scaffold:** Node 24.16 and npm 11.13 (CI uses Node 24), React 19.3, Vite 8.3, Vitest 5.1, zod 4.6, `@mediapipe/tasks-vision` 1.2.3. TypeScript is pinned to 6.0.x because typescript-eslint supports versions below 6.1 only.
 
@@ -69,7 +70,7 @@ Gating has two layers.
 - **Scope.** The gate runs from the framing check through the end of the set. Losing tracking during calibration restarts calibration. Losing it during the countdown returns to the framing check.
 - **Framing pass** needs reliable frames continuously for `framing.stableMs` (about 1 s) and an effective frame rate of at least `tracking.minFps`. For side-view exercises, the chosen side's joints must also be the more visible ones, because the model can swap the near and far legs. Mean brightness only chooses the message ("lighting looks dim"); it never lets a set start by itself (AC 19).
 
-The signal this gate relies on is unproven. M0.5 tests it before any product code is written (§8).
+The signal this gate relies on is unproven. M0.5 was meant to test it before any product code was written. It is deferred, so the gate is built first and measured in M5 (§8). Until that measurement passes, the framing side check stays mandatory and no volunteer uses the app.
 
 ## 4. Project structure
 
@@ -83,7 +84,7 @@ src/
 public/config/targets.json    Therapist config, fetched at runtime without caching
 public/models/, public/wasm/  Fetched by script, not committed
 scripts/                      fetch-models, extract (video to trace), replay (trace to session log, in Node)
-fixtures/synthetic/           Generator, with a noise model from the M0.5 traces, and generated sequences
+fixtures/synthetic/           Generator, with a noise model from real team-member traces (M1 onward), and generated sequences
 docs/                         definitions.md, recording-protocol.md, evaluation-report.md
 eval/                         Python scoring script, validators, schemas, tests
 data/                         Not committed: videos, traces, raw logs, consent records (C-4)
@@ -200,7 +201,7 @@ Feedback delay (AC 21) is measured in live sessions on the target devices, not i
 
 ## 8. Milestones
 
-Order: **M0 → M0.5 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8.** Each milestone ends with something that can be demonstrated. O-4 and O-5 gate M7 and M8 and take time, so they start on day one. M6 can start once the log schema is stable at the end of M1.
+Order: **M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8.** M0.5 is deferred; its gate measurement runs in M5 (see below). Each milestone ends with something that can be demonstrated. O-4 and O-5 gate M7 and M8 and take time, so they start on day one. M6 can start once the log schema is stable at the end of M1.
 
 The exercise order in SPEC 4.1 holds: each exercise works end to end before the next is started. The settings form comes after the three exercises because the config shape settles during them; until then, tuning is done by editing the JSON file.
 
@@ -218,7 +219,17 @@ Every milestone keeps CI green: `npm ci`, `check:data`, `typecheck`, `lint`, `te
 - ESLint enforces the purity of `src/core/`.
 - Headless browser: the dev server after `npm ci`, and the production build served from a subpath.
 
-### M0.5 — Tracking-reliability spike (next)
+### M0.5 — Tracking-reliability spike (deferred)
+
+**Deferred on 2026-11-24.** The owner can't record the takes now. The spike tooling stays in `spike/` (local, not committed), and the plan below is kept as the specification of the measurement. What moved where:
+
+- **Gate measurement (Pass criteria below):** M5, on real traces exported by the app, recorded in the same eight scenarios on a laptop and a phone with both model variants. It must pass before M7 starts.
+- **Framing side check:** mandatory from M1 rather than conditional on finding left/right swaps.
+- **Dim-light jitter term:** decided from the M5 dim-room runs.
+- **Timestamp metadata:** the `device.clock` fallback (§5) already covers browsers without `captureTime`. The value seen on each target device is recorded in M1.
+- **Phone video decoding for replay:** checked in M6, where `extract` needs it.
+- **Primary angle (2D or 3D):** chosen from M1–M3 live testing (§10).
+- **Noise model for synthetic tests:** hand-written noise until real team-member traces exist.
 
 **Scope:** test the riskiest assumption in the design: that "no pose, a visibility threshold and an in-frame check on the required joints" reliably signals unreliable tracking. AC 16–19 and R-S1 depend on it. A scratch page records landmark traces (no video) of a team member, on a laptop and a phone, with both model variants, in eight scenarios:
 - normal knee extension;
@@ -247,7 +258,7 @@ It also records inference time, frame rate, whether timestamp metadata is availa
 
 **Scope, in order:**
 1. Camera, `PoseEngine`, overlay and trace export.
-2. Core logic, tested on synthetic and spike traces.
+2. Core logic, tested on synthetic traces (and real team-member traces once recorded).
 3. The app shell on `TraceSource`.
 4. Gating, latency timestamps and log export.
 
@@ -258,6 +269,7 @@ Then a phone smoke test over `dev:https`.
 **Checks:**
 - Unit tests:
   - phase reducer rejects illegal transitions (AC 4);
+  - framing fails when the chosen side's joints are not the more visible ones (side check mandatory while M0.5 is deferred);
   - framing with missing joints (AC 3);
   - hold completes, hold breaks, target never reached (AC 8);
   - below target and at target ± tolerance (AC 9);
@@ -284,7 +296,7 @@ Then a phone smoke test over `dev:https`.
 **Exit:** AC 10 and 11. The M1 gating and log checks are re-run for this exercise.
 
 **Checks:**
-- Unit tests: full cycle, partial rise, double bounce, and the spike traces (AC 10); fast, slow and in-range tempo (AC 11).
+- Unit tests: full cycle, partial rise, double bounce, and real sit-to-stand traces when available (AC 10); fast, slow and in-range tempo (AC 11).
 - Component test: tempo shown in the summary.
 - The M1 gating, randomized-cue and log-invariant tests are re-run for sit-to-stand.
 - Manual: real sets at the 45° front-side camera position.
@@ -316,14 +328,16 @@ Then a phone smoke test over `dev:https`.
 - automatic full-to-lite fallback, decided during framing and never mid-set;
 - performance on a mid-range phone;
 - dim-light and covered-camera runs on each device;
+- the deferred M0.5 gate measurement: record the eight M0.5 scenarios with the app's trace export, on a laptop and a phone, with both model variants, and score them against the M0.5 pass criteria. This needs a small adapter from pose trace v1, plus scenario and BAD/GOOD marks, to the spike analyzer's input;
 - cue-text check (R-S2, R-S3);
 - README tested on a clean clone;
 - remaining Playwright tests.
 
-**Exit:** AC 16–19 verified on device; AC 28; minimum device spec recorded (O-6).
+**Exit:** AC 16–19 verified on device; the M0.5 pass criteria met on every device and variant, or secondary signals added and measured again; AC 28; minimum device spec recorded (O-6).
 
 **Checks:**
 - Unit test of the fallback policy with injected frame rates (R-F1).
+- M0.5 gate measurement: one gate setting catches at least 99% of bad frames, flags fewer than 2% of good frames, and detects every bad episode within 500 ms, in every device and variant group. Dim-light jitter compared with good light decides whether framing needs a jitter or brightness term.
 - Automated cue-text check for banned words, then a therapist read-through of every cue.
 - Manual on each target device: dim room (AC 19), covered camera and joint out of view (AC 16, 17), and median feedback delay measured from live logs.
 - Clean-machine walkthrough of the README, one set per exercise (AC 28).
@@ -343,7 +357,7 @@ Then a phone smoke test over `dev:https`.
 
 ### M7 — Development recordings, tuning and freeze
 
-Gated on O-4 and O-5.
+Gated on O-4 and O-5, and on the M0.5 gate measurement passing in M5. No volunteer uses the app before then.
 
 **Exit:** the frozen config and lock file are committed. `score.py --split dev` runs. The test split is untouched.
 
@@ -386,7 +400,7 @@ Gated on O-4 and O-5.
 | 7 | C: disclaimer present in every phase, including error states. |
 | 8 | U: hold completes, hold breaks, target never reached. M. |
 | 9 | U: below target, and at target ± tolerance. |
-| 10 | U: full cycle, partial rise, double bounce; spike traces. M. |
+| 10 | U: full cycle, partial rise, double bounce; real traces when available. M. |
 | 11 | U: fast, slow and in-range tempo. C: tempo in the summary. |
 | 12 | U: reset threshold behavior. |
 | 13 | U: lean relative to a baseline that is already tilted. |
@@ -422,7 +436,7 @@ Requirements without a numbered criterion:
 | Attempt and repetition definitions, hold break, sit-to-stand cycle | Manual counts, labels, scoring | `docs/definitions.md`, before M7 |
 | Rule IDs and issue categories | Therapist labels, precision and recall | Before M7 |
 | Angle conventions and config field names | Config, form, logs, goniometer comparison | M0 |
-| Primary angle per exercise (image-plane 2D or world 3D) | Exercise engines | First choice from M0.5 and live testing; development data only confirms or changes it |
+| Primary angle per exercise (image-plane 2D or world 3D) | Exercise engines | First choice from M1–M3 live testing (M0.5 deferred); development data only confirms or changes it |
 | Latency definition (onset, confirmation, shown) | AC 21, report | M0 |
 | Pure clock-free core, async `PoseEngine`, `FrameSource` boundary | Testability, performance | M0 (not yet built; see open decision 1 in Status) |
 | Config shape and versioning | JSON file, form, logs | M0 (values stay tunable) |
@@ -450,5 +464,5 @@ These are not needed for any acceptance criterion before the milestone shown:
 - Full Playwright suite and automatic model fallback: M5.
 - Report template and freeze lock: M7.
 - Contrast measure: dropped; mean brightness only.
-- World-landmark angles: only for exercises where M0.5 shows image-plane angles fail.
+- World-landmark angles: only for exercises where live testing shows image-plane angles fail.
 - One-Euro smoothing filter: an exponential moving average unless development data needs more.
