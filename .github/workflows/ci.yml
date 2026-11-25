@@ -25,4 +25,4 @@ jobs:
           path: public/models
           key: pose-models-${{ hashFiles('scripts/fetch-models.mjs') }}
       - run: npm run build
-      # Deferred (SPEC 8.1): Playwright smoke test from M1, pytest from M6.
+      # Deferred (PLANS.md §1): Playwright smoke test from M1, pytest from M6.

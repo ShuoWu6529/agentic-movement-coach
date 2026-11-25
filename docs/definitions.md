@@ -1,6 +1,6 @@
 # Definitions (v0, draft)
 
-Status: draft for M0. These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (SPEC 8.10). Items marked **(confirm)** are working assumptions (SPEC 8.11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
+Status: draft for M0. These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (PLANS.md §10). Items marked **(confirm)** are working assumptions (PLANS.md §11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
 
 ## Angle conventions
 
@@ -18,13 +18,13 @@ Worked examples:
 - `targetElevationDeg: 90`, `toleranceDeg: 10`. An arm that reaches 82° meets the target (within 90 − 10). At 75° it does not.
 - `leanToleranceDeg: 10`. A patient who sits with 4° of tilt at calibration and leans to 15° during a raise has leaned 11° from baseline, which is beyond tolerance.
 
-Which angle is used (image-plane 2D or world 3D) per exercise is chosen from M0.5 and live testing (SPEC 8.10).
+Which angle is used (image-plane 2D or world 3D) per exercise is chosen from M0.5 and live testing (PLANS.md §10).
 
 ## Attempt and repetition
 
 - An **attempt** is one movement cycle, whether or not it counts. Therapist labels and feedback scoring are per attempt (O-8).
 - A **repetition** is an attempt that meets the exercise's completion rule below. Only repetitions increase the on-screen counter.
-- An attempt in progress when tracking becomes unreliable is discarded: it is neither an attempt nor a repetition. Completed repetitions are kept (SPEC 8.3) **(confirm)**.
+- An attempt in progress when tracking becomes unreliable is discarded: it is neither an attempt nor a repetition. Completed repetitions are kept (PLANS.md §3) **(confirm)**.
 
 ### Seated knee extension
 
@@ -86,12 +86,12 @@ App attempts are aligned to therapist attempts by time overlap (`tStart`–`tEnd
 
 ## Latency
 
-Each `cue` event in the session log records three times (SPEC 8.5), all in ms on the frame clock:
+Each `cue` event in the session log records three times (PLANS.md §5), all in ms on the frame clock:
 
 - `onsetT`: the frame in which the rule's condition first became true.
 - `confirmT`: the frame in which its dwell time (`cues.dwellMs[ruleId]`) was met.
 - `shownAt`: the next animation frame after the cue was committed for display.
 
-**Feedback delay** is `shownAt − onsetT`. The report also gives `shownAt − confirmT`. The O-2 target is a median of 300 ms or less, with the worst case reported. Delay is measured in live sessions on target devices, not in replay (SPEC 8.7).
+**Feedback delay** is `shownAt − onsetT`. The report also gives `shownAt − confirmT`. The O-2 target is a median of 300 ms or less, with the worst case reported. Delay is measured in live sessions on target devices, not in replay (PLANS.md §7).
 
 Tracking-loss delay is `tracking_lost.t − firstBadT` (AC 16: within 1 s).

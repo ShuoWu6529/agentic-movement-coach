@@ -1,4 +1,4 @@
-// Pose trace v1 (SPEC 8.5): recorded landmark sequences for TraceSource, tests, fixtures and replay.
+// Pose trace v1 (PLANS.md §5): recorded landmark sequences for TraceSource, tests, fixtures and replay.
 // Drafted from the M0.5 spike's v0 format. Landmarks are flat arrays to keep traces compact.
 
 import { z } from 'zod';
@@ -18,7 +18,7 @@ export const TraceFrameSchema = z
     lm: flat(NUM_LANDMARKS * LM_STRIDE).nullable(),
     world: flat(NUM_LANDMARKS * WORLD_STRIDE).nullable(),
   })
-  // A frame has a whole pose or none (SPEC 8.5): never image landmarks without world landmarks, or the reverse.
+  // A frame has a whole pose or none (PLANS.md §5): never image landmarks without world landmarks, or the reverse.
   .refine((f) => (f.lm === null) === (f.world === null), {
     path: ['world'],
     message: 'lm and world must both be set or both be null',

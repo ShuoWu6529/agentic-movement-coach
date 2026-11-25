@@ -17,7 +17,7 @@ export default tseslint.config(
     },
   },
   {
-    // SPEC 8.2 principle 1: the core is pure. No React, DOM adapters or MediaPipe.
+    // PLANS.md §2 principle 1: the core is pure. No React, DOM adapters or MediaPipe.
     files: ['src/core/**/*.ts'],
     ignores: ['src/core/**/*.test.ts'], // tests run in Node and may read fixtures from disk
     rules: {

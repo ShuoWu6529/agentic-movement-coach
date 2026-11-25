@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Browser app for the AI Movement Coach pilot. `SPEC.md` is the source of truth; propose changes to it to the owner before editing it.
+Browser app for the AI Movement Coach pilot. `SPEC.md` is the source of truth; propose changes to it to the owner before editing it. `PLANS.md` holds the technical design, milestone order, the checks for each milestone and current status; update its Status section when a milestone lands.
 
 ## Commands (all verified on Node 24.16 / npm 11.13)
 

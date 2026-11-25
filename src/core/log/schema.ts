@@ -1,4 +1,4 @@
-// Session log v1 (R-F10, R-F11, SPEC 8.5). Shared with the Python scoring script, which will
+// Session log v1 (R-F10, R-F11, PLANS.md §5). Shared with the Python scoring script, which will
 // validate against a JSON Schema generated from this one (M6). No breaking changes after M7 starts.
 
 import { z } from 'zod';
