@@ -12,13 +12,14 @@ npm run build          # fetch-models, tsc --noEmit, vite build -> dist/
 npm run preview        # serve dist/
 npm test               # vitest run (jsdom)
 npm run test:watch
+npm run test:e2e       # Playwright on the production build (run `npm run build` first)
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint .
 npm run check:data     # fails if anything under data/ is tracked by git
 npm run fetch-models   # copy MediaPipe wasm, download pose models, verify pinned sha256
 ```
 
-CI (`.github/workflows/ci.yml`) runs: `npm ci`, `check:data`, `typecheck`, `lint`, `test`, `build`.
+CI (`.github/workflows/ci.yml`) runs: `npm ci`, `check:data`, `typecheck`, `lint`, `test`, `build`, `test:e2e`.
 
 ## Notes
 
@@ -32,8 +33,10 @@ CI (`.github/workflows/ci.yml`) runs: `npm ci`, `check:data`, `typecheck`, `lint
 
 ## Layout
 
-- `src/core/`: pure logic (config schema, load and hash; rule registry; log and trace schemas).
-- `src/app/`: React shell (phase reducer, screens, components).
+- `src/core/`: pure logic (config; gate, framing, calibration; exercise engines; cue gate; `SetSession`; summary; log and trace schemas).
+- `src/pose/`: browser edges (MediaPipe `PoseEngine`, camera and trace frame sources, watchdog).
+- `src/app/`: React shell (phase reducer, `SetRunner` frame loop, screens, components).
+- `fixtures/synthetic/`: synthetic pose-trace generator used by tests (no real people).
 - `public/config/targets.json`: therapist config, fetched with `cache: 'no-store'`.
 - `docs/definitions.md`: attempt, repetition, angle, latency and scoring definitions.
 

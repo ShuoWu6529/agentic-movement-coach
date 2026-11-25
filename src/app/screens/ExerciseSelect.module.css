@@ -11,6 +11,7 @@
 }
 .option {
   width: 100%;
+  box-sizing: border-box;
   display: grid;
   gap: 0.25rem;
   text-align: left;
@@ -21,11 +22,8 @@
   color: inherit;
   font: inherit;
 }
-.option:not(:disabled) {
-  cursor: pointer;
-}
 .option:disabled {
-  opacity: 0.75;
+  opacity: 0.6;
 }
 .name {
   font-size: 1.15rem;
@@ -35,8 +33,35 @@
   color: var(--muted);
   font-size: 0.9rem;
 }
-.pending {
+.sides {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.side {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+.side:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.research {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+.research summary {
+  cursor: pointer;
   color: var(--muted);
-  font-size: 0.85rem;
-  margin-top: 1rem;
+}
+.field {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
 }

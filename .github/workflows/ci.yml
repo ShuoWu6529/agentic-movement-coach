@@ -25,4 +25,12 @@ jobs:
           path: public/models
           key: pose-models-${{ hashFiles('scripts/fetch-models.mjs') }}
       - run: npm run build
-      # Deferred (PLANS.md §1): Playwright smoke test from M1, pytest from M6.
+      # Playwright (M1): fake-camera smoke, camera permission denied, log download. pytest joins in M6.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

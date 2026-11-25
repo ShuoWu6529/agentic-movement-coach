@@ -1,5 +1,8 @@
-// Session log v1 (R-F10, R-F11, PLANS.md §5). Shared with the Python scoring script, which will
+// Session log v2 (R-F10, R-F11, PLANS.md §5). Shared with the Python scoring script, which will
 // validate against a JSON Schema generated from this one (M6). No breaking changes after M7 starts.
+// v2 (M1): attempt events carry `tStart`, so scoring can align app attempts with labeled attempts by
+// time overlap; `device.clock` gains 'trace' for sessions replayed from a pose trace. No v1 logs
+// were ever recorded, so there is no migration.
 
 import { z } from 'zod';
 import { TargetsConfigSchema } from '../config/schema';
@@ -26,7 +29,10 @@ export const LogEventSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('phase'), t: z.number(), phase: z.string() }),
   z.strictObject({
     type: z.literal('attempt'),
+    /** When the attempt ended. */
     t: z.number(),
+    /** When the attempt started. */
+    tStart: z.number(),
     index: z.number().int().nonnegative(),
     counted: z.boolean(),
     peak: z.number(),
@@ -48,7 +54,7 @@ export const LogEventSchema = z.discriminatedUnion('type', [
 ]);
 
 export const SessionLogSchema = z.strictObject({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   app: z.strictObject({ version: z.string(), gitSha: z.string() }),
   config: z.strictObject({ hash: z.string().regex(/^[0-9a-f]{64}$/), value: TargetsConfigSchema }),
   exercise: z.enum(EXERCISE_IDS),
@@ -57,7 +63,8 @@ export const SessionLogSchema = z.strictObject({
   device: z.strictObject({
     userAgent: z.string(),
     camera: z.strictObject({ w: z.number(), h: z.number(), fps: z.number() }),
-    clock: z.enum(['captureTime', 'callback']),
+    /** Where frame `t` came from: rVFC captureTime, the callback time, or a replayed pose trace. */
+    clock: z.enum(['captureTime', 'callback', 'trace']),
   }),
   model: z.strictObject({ variant: z.enum(['full', 'lite']), delegate: z.enum(['GPU', 'CPU']) }),
   calibration: z.strictObject({ t: z.number(), baseline: z.record(z.string(), z.number()) }),
