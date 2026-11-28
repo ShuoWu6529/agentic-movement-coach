@@ -4,6 +4,7 @@
 
 import type { Baseline } from '../calibration';
 import type { PoseFrame } from '../pose';
+import type { GateReason } from '../reliability';
 import type { CueCandidate } from '../rules/cueGate';
 import type { IssueCategory } from '../rules/registry';
 import type { KneeSummary, SitToStandSummary } from '../summary';
@@ -63,6 +64,12 @@ export interface Exercise {
   readonly state: string;
   readonly reps: number;
   readonly calibration: Baseline | null;
+  /**
+   * Calibrate again after Resume, instead of only the short framing check. Sit-to-stand does: its
+   * progress is measured in picture coordinates, so a camera moved during the pause would throw off
+   * counting (the owner's M2 manual set).
+   */
+  readonly recalibrateOnResume: boolean;
 
   /** This frame's measurements; called on reliable frames only. Always returns the same keys. */
   measure(f: PoseFrame): Measures;
@@ -77,6 +84,11 @@ export interface Exercise {
   calibrationStage(): CalibrationStage;
   calibrate(f: PoseFrame, m: Measures): CalibrationStep;
 
+  /**
+   * An exercise's own reliability check for frames in the active set, after the joint gate passed.
+   * A reason makes the frame unreliable, exactly like a failed gate (R-S1); null means it is fine.
+   */
+  checkInSet(m: Measures): GateReason | null;
   /** The engine's input this frame, or null when it can't be computed (handled as unreliable). */
   input(m: Measures): number | null;
   step(t: number, value: number): ExerciseStep;

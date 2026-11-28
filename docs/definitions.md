@@ -1,6 +1,6 @@
 # Definitions (v1, draft)
 
-Status: draft, v0 written in M0, extended in M1 (knee attempt end, attempt indices, tracking reliability, cue conditions) and M2 (sit-to-stand calibration, progress, tempo, cue conditions, the last repetition's cue). These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (PLANS.md §10). Items marked **(confirm)** are working assumptions (PLANS.md §11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
+Status: draft, v0 written in M0, extended in M1 (knee attempt end, attempt indices, tracking reliability, cue conditions) and M2 (sit-to-stand calibration, progress, tempo, cue conditions, the last repetition's cue; after the manual set: calibration hold order, recalibration on Resume, the body-size guard). These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (PLANS.md §10). Items marked **(confirm)** are working assumptions (PLANS.md §11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
 
 ## Angle conventions
 
@@ -42,17 +42,19 @@ Which angle is used (image-plane 2D or world 3D) per exercise is chosen from liv
 ### Sit-to-stand
 
 - **Shoulder height** is the mean image y of the two shoulders, in pixels. Both shoulders are averaged, so it does not depend on which side faces the camera. Only trunk joints (both shoulders and hips) are required, because the chair can hide the legs (M0.5 S6).
-- **Calibration** has two stages, each a still hold of `calibration.durationMs` (restarted by movement beyond `calibration.maxMotion`):
-  1. Seated: records the seated shoulder height and the seated **trunk length** (shoulder midpoint to hip midpoint, pixels).
-  2. Standing: records the standing shoulder height. A still pose counts only if the shoulders are at least `minStandRise` trunk lengths above the seated height; a lower still pose is ignored, because the patient has not stood up yet.
+- **Calibration** takes two still holds, each of `calibration.durationMs` (restarted by movement beyond `calibration.maxMotion`). Each records the shoulder height, the **trunk length** (shoulder midpoint to hip midpoint, pixels) and the **shoulder width** (distance between the shoulders, pixels).
+  1. The patient is asked to sit still, then to stand still.
+  2. The second hold counts only if its shoulder height differs from the first by at least `minStandRise` trunk lengths (of the first hold); a still pose closer than that is ignored.
+  3. The lower of the two in the picture is the seated height, the higher the standing height, whichever came first. So a patient who stands still for a moment before sitting down is still calibrated correctly (found in the M2 manual set, 2026-11-28).
 
-  An unreliable frame in either stage restarts calibration from the seated stage. The set starts after the countdown, during which the patient sits down again.
+  An unreliable frame restarts calibration from the first hold. The set starts after the countdown, during which the patient sits down again. **After tracking loss, Resume repeats both holds** before the countdown, because the camera may have moved while the patient was at the laptop (in the M2 manual set, covering the camera tilted the laptop lid and moved the whole body about 45 px in the picture).
 - **Progress** is the normalized height of the shoulders between the calibrated seated height (0) and standing height (1): (seated − current) / (seated − standing). It can go below 0 (leaning forward while seated) or above 1.
 - **Attempt:** starts when progress rises above `sitFrac` and ends when it returns to `sitFrac` or below. Its `peak` is the highest progress reached.
 - **Cycle:** seated (progress at most `sitFrac`), then standing (progress at least `standFrac`), then seated again. One full cycle is one repetition. The counter increases when the patient is seated again (AC 10). A dip below `standFrac` that does not reach `sitFrac` ("double bounce") stays in the same attempt.
 - A rise that does not reach `standFrac` before returning to seated is an attempt that does not count. It has no tempo and no issue.
 - **Rise time:** from the first frame above `sitFrac` to the first frame at or above `standFrac`. **Lower time:** from the first frame below `standFrac` after the last standing frame, to the first frame at or below `sitFrac`. Outside `riseMs` or `lowerMs` gives a `too_fast` or `too_slow` issue. An attempt lists each category once, even if both the rise and the lower had it.
 - When the set starts, and after tracking loss, a new attempt can start only once progress is at or below `sitFrac`, so sitting down after the standing calibration is not a repetition, and a stand made while tracking was lost is never completed.
+- **Body-size guard:** during the active set, a frame whose shoulder width differs from the calibrated width (the mean of the seated and standing holds) by more than `maxScaleChange`, as a fraction, is unreliable, exactly as if a required joint were out of view: no measurements, no cue, the attempt in progress discarded, and the set pauses after `tracking.unreliableAfterMs`. It catches the patient walking toward or away from the camera, for example to reach the laptop, which otherwise reads as sitting down (a false repetition in the M2 manual set). Worked example: calibrated widths 155 and 176 px give a reference of 165.5 px; with `maxScaleChange: 0.3`, widths from about 116 to 215 px are accepted.
 
 Worked example: `minStandRise: 0.4`. A patient whose seated trunk length is 120 px must raise the shoulders at least 48 px above the seated height for the standing hold to count. With a seated height of y = 220 and a standing height of y = 124, a shoulder height of y = 140 is progress (220 − 140) / (220 − 124) = 0.83, below `standFrac: 0.85`.
 
@@ -68,13 +70,13 @@ The config loader rejects values that would make these definitions impossible:
 
 - `startFlexionDeg` must be greater than `targetFlexionAtMostDeg` + `toleranceDeg`.
 - `sitFrac` must be less than `standFrac`.
-- `minStandRise` is between 0.05 and 2 trunk lengths.
+- `minStandRise` is between 0.05 and 2 trunk lengths; `maxScaleChange` between 0.05 and 1.
 - `resetElevationDeg` must be less than `targetElevationDeg` − `toleranceDeg`.
 - `cues.dwellMs` must have an entry for every `advice` rule.
 
 ## Tracking reliability
 
-- A frame is **unreliable** if no pose is detected, if any required joint has visibility below `tracking.minVisibility`, or if any required joint lies within `tracking.boundsMargin` of the frame edge. Knee extension requires the chosen side's hip, knee and ankle. Sit-to-stand requires both shoulders and both hips.
+- A frame is **unreliable** if no pose is detected, if any required joint has visibility below `tracking.minVisibility`, or if any required joint lies within `tracking.boundsMargin` of the frame edge. Knee extension requires the chosen side's hip, knee and ankle. Sit-to-stand requires both shoulders and both hips, and during the set its frames must also pass the body-size guard (see Sit-to-stand above).
 - On an unreliable frame during the set, the cue display clears, the attempt in progress is discarded, and the log row has `trackingOk: false`, no angle and no movement cue. After `tracking.unreliableAfterMs` of unreliable frames the set pauses ("can't see you well").
 - **Stalled camera:** if no frame is delivered for more than two frame intervals at `tracking.minFps` (2 × 1000 / `minFps` ms of wall time), the app injects "no pose" frames, so a frozen camera counts as unreliable tracking. With `minFps: 12` that is about 167 ms.
 

@@ -36,16 +36,23 @@ describe('session log schema v2', () => {
     expect(SessionLogSchema.safeParse(await minimalLog()).success).toBe(true);
   });
 
-  it('still accepts a log recorded in M1, whose embedded config is v1 (no minStandRise)', async () => {
+  it('still accepts logs recorded with config v1 (M1) and v2 (early M2)', async () => {
     const log = await minimalLog();
-    const v1 = structuredClone(config);
+    const withConfig = (value: unknown) => SessionLogSchema.safeParse({ ...log, config: { ...log.config, value } }).success;
+    const v2 = structuredClone(config);
+    v2.schemaVersion = 2;
+    delete v2.exercises.sitToStand.maxScaleChange;
+    const v1 = structuredClone(v2);
     v1.schemaVersion = 1;
     delete v1.exercises.sitToStand.minStandRise;
-    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: v1 } }).success).toBe(true);
-    // Each version is checked against its own shape: v1 with the v2 field, or v2 without it, is rejected.
-    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...v1, exercises: config.exercises } } }).success).toBe(false);
-    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...config, exercises: v1.exercises } } }).success).toBe(false);
-    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...config, schemaVersion: 3 } } }).success).toBe(false);
+    expect(withConfig(v2)).toBe(true);
+    expect(withConfig(v1)).toBe(true);
+    // Each version is checked against its own shape: an older version with newer fields, or the
+    // current version without them, is rejected, and so is an unknown version.
+    expect(withConfig({ ...v1, exercises: config.exercises })).toBe(false);
+    expect(withConfig({ ...v2, exercises: config.exercises })).toBe(false);
+    expect(withConfig({ ...config, exercises: v2.exercises })).toBe(false);
+    expect(withConfig({ ...config, schemaVersion: 4 })).toBe(false);
   });
 
   it('rejects an unknown schemaVersion and a missing observer note', async () => {

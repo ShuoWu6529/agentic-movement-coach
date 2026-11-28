@@ -6,7 +6,8 @@ import type { TargetsConfig } from './config/schema';
 import { imagePoint, legJoints, TRUNK_JOINTS } from './pose';
 import type { BuiltExerciseId, Side } from './types';
 
-export type GateReason = 'noPose' | 'outOfFrame' | 'lowVisibility';
+/** `scale`: the body's size in the picture no longer matches calibration (sit-to-stand, during the set). */
+export type GateReason = 'noPose' | 'outOfFrame' | 'lowVisibility' | 'scale';
 
 export interface GateResult {
   ok: boolean;

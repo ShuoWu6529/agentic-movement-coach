@@ -64,7 +64,7 @@ describe('App start-up', () => {
   });
 
   it('rejects an unknown schemaVersion', async () => {
-    serveConfig({ ...defaultConfig, schemaVersion: 3 });
+    serveConfig({ ...defaultConfig, schemaVersion: 4 });
     render(<App />);
     expect(await screen.findByRole('alert')).toHaveTextContent('schemaVersion');
   });

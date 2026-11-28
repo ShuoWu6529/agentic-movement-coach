@@ -9,14 +9,25 @@
 
 import { LM_STRIDE, NUM_LANDMARKS, WORLD_STRIDE, type PoseTrace, type TraceFrame } from '../../src/core/trace/schema';
 
+/**
+ * Where the body appears in the picture: `scale` (moving toward the camera makes it larger, about the
+ * frame centre), moved linearly to `scaleTo` over the segment, and `shiftY` pixels down (the camera
+ * tilted up). Both default to no change.
+ */
+export interface StsView {
+  scale?: number;
+  scaleTo?: number;
+  shiftY?: number;
+}
+
 export type StsSegment =
   /** Progress held, or moved linearly from `from` to `to`, over `ms`. */
-  | { ms: number; p: number }
-  | { ms: number; from: number; to: number }
+  | ({ ms: number; p: number } & StsView)
+  | ({ ms: number; from: number; to: number } & StsView)
   /** No pose detected (camera covered). */
   | { ms: number; noPose: true }
   /** Pose present but the shoulders score low (a required joint out of view). */
-  | { ms: number; lowVisibility: true; p: number };
+  | ({ ms: number; lowVisibility: true; p: number } & StsView);
 
 export interface StsTraceOptions {
   segments: StsSegment[];
@@ -53,15 +64,24 @@ function gaussian(rand: () => number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
 }
 
-function profileAt(segments: StsSegment[], ms: number): { p: number; mode: 'ok' | 'noPose' | 'lowVisibility' } | null {
+interface Profile {
+  p: number;
+  mode: 'ok' | 'noPose' | 'lowVisibility';
+  scale: number;
+  shiftY: number;
+}
+
+function profileAt(segments: StsSegment[], ms: number): Profile | null {
   let start = 0;
   for (const s of segments) {
     if (ms < start + s.ms) {
       const k = (ms - start) / s.ms;
-      if ('noPose' in s) return { p: 0, mode: 'noPose' };
-      if ('lowVisibility' in s) return { p: s.p, mode: 'lowVisibility' };
-      if ('from' in s) return { p: s.from + (s.to - s.from) * k, mode: 'ok' };
-      return { p: s.p, mode: 'ok' };
+      if ('noPose' in s) return { p: 0, mode: 'noPose', scale: 1, shiftY: 0 };
+      const s0 = s.scale ?? 1;
+      const view = { scale: s0 + ((s.scaleTo ?? s0) - s0) * k, shiftY: s.shiftY ?? 0 };
+      if ('lowVisibility' in s) return { p: s.p, mode: 'lowVisibility', ...view };
+      if ('from' in s) return { p: s.from + (s.to - s.from) * k, mode: 'ok', ...view };
+      return { p: s.p, mode: 'ok', ...view };
     }
     start += s.ms;
   }
@@ -127,8 +147,10 @@ export function sitToStandTrace(opts: StsTraceOptions): PoseTrace {
     const world = new Array<number>(NUM_LANDMARKS * WORLD_STRIDE).fill(0);
     for (let k = 0; k < NUM_LANDMARKS; k++) {
       const q = pts.get(k)!;
-      const x = q.px[0] + noise * gaussian(rand);
-      const y = q.px[1] + noise * gaussian(rand);
+      const vx = width / 2 + (q.px[0] - width / 2) * prof.scale;
+      const vy = height / 2 + (q.px[1] - height / 2) * prof.scale + prof.shiftY;
+      const x = vx + noise * gaussian(rand);
+      const y = vy + noise * gaussian(rand);
       const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
       lm.splice(k * LM_STRIDE, LM_STRIDE, r4(x / width), r4(y / height), r4(q.z), q.vis, 0.99);
       world.splice(k * WORLD_STRIDE, WORLD_STRIDE, r4((x - X0) / PX_PER_M), r4((y - hy) / PX_PER_M), r4(q.z));
@@ -147,10 +169,18 @@ export function sitToStandTrace(opts: StsTraceOptions): PoseTrace {
 export const STS_SETTLE: StsSegment[] = [
   { ms: 3600, p: 0 },
   { ms: 1500, from: 0, to: 1 },
-  { ms: 2600, p: 1 },
+  // 2 s for the hold, plus room for one restart when the still pose settles right at maxMotion.
+  { ms: 3500, p: 1 },
   { ms: 1500, from: 1, to: 0 },
   { ms: 2500, p: 0 },
 ];
+
+/**
+ * Back from tracking loss with Resume pressed as soon as it is offered: seated through the recovery
+ * (1 s), the short framing check (1 s) and the seated hold (2 s), then the standing hold and the
+ * sit-down during the countdown, as at the start of the set.
+ */
+export const STS_RESUME: StsSegment[] = [{ ms: 1200, p: 0 }, ...STS_SETTLE];
 
 /**
  * One sit, stand, sit cycle. `up` and `down` are the ramp durations; the measured rise and lower times

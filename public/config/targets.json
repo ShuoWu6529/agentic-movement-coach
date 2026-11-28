@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "configVersion": "0.3-dev",
+  "schemaVersion": 3,
+  "configVersion": "0.4-dev",
   "tracking": {
     "minVisibility": 0.5,
     "boundsMargin": 0.02,
@@ -41,7 +41,8 @@
       "lowerMs": [1500, 4000],
       "standFrac": 0.85,
       "sitFrac": 0.2,
-      "minStandRise": 0.4
+      "minStandRise": 0.4,
+      "maxScaleChange": 0.3
     },
     "shoulderRaise": {
       "targetElevationDeg": 90,

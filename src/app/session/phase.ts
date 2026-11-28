@@ -36,6 +36,8 @@ interface InSession extends Ready {
   selection: Selection;
   /** Bumped on each camera attempt, so a retry starts a fresh source. */
   attempt: number;
+  /** True once the set has been active; only a started set can finish (a summary needs a set). */
+  started: boolean;
 }
 
 export type PhaseState =
@@ -87,21 +89,27 @@ export function phaseReducer(state: PhaseState, action: PhaseAction): PhaseState
       return can('configError') ? { phase: 'configError', problems: action.problems } : state;
     case 'choose':
       if (state.phase !== 'select') return state;
-      return { phase: 'permission', config: state.config, configHash: state.configHash, selection: action.selection, attempt: 1 };
+      return { phase: 'permission', config: state.config, configHash: state.configHash, selection: action.selection, attempt: 1, started: false };
     case 'sourceReady':
       return state.phase === 'permission' ? { ...state, phase: 'framing' } : state;
     case 'sourceFailed':
       return state.phase === 'permission' ? { ...state, phase: 'cameraError', error: action.error } : state;
     case 'retry':
       if (state.phase !== 'cameraError') return state;
-      return { phase: 'permission', config: state.config, configHash: state.configHash, selection: state.selection, attempt: state.attempt + 1 };
+      return { phase: 'permission', config: state.config, configHash: state.configHash, selection: state.selection, attempt: state.attempt + 1, started: false };
     case 'setPhase':
       if (!('selection' in state) || state.phase === 'summary' || !can(action.phase)) return state;
       if (state.phase === 'permission' || state.phase === 'cameraError') return state;
-      return { phase: action.phase, config: state.config, configHash: state.configHash, selection: state.selection, attempt: state.attempt };
+      return {
+        phase: action.phase, config: state.config, configHash: state.configHash, selection: state.selection,
+        attempt: state.attempt, started: state.started || action.phase === 'active',
+      };
     case 'finished':
-      if (!('selection' in state) || !can('summary')) return state;
-      return { phase: 'summary', config: state.config, configHash: state.configHash, selection: state.selection, attempt: state.attempt, finished: action.finished };
+      if (!('selection' in state) || !state.started || !can('summary')) return state;
+      return {
+        phase: 'summary', config: state.config, configHash: state.configHash, selection: state.selection,
+        attempt: state.attempt, started: true, finished: action.finished,
+      };
     case 'back':
       if (!('config' in state) || !can('select')) return state;
       return { phase: 'select', config: state.config, configHash: state.configHash };

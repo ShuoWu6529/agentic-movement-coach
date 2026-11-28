@@ -11,7 +11,7 @@ The plan was reviewed against SPEC sections 3–7 before scaffolding, and the ch
 | M0 Scaffold and definitions | **Done** | PR #3 (scaffold) and PR #4 (review fixes) merged. CI is green on `main`. 29 Vitest tests. Headless Chromium shows the exercise list and disclaimer from `npm run dev` after a clean `npm ci` and from a production build served at a subpath. |
 | M0.5 Tracking-reliability spike | **Done** (2026-11-27) | Passes on the laptop webcam with `full`, the only supported device (phones and `lite` dropped: SPEC C-1, R-F1). At the app's current gate setting (visibility 0.5, margin 0.02), over all eight scenarios: 100% of bad frames caught (457 / 457), 0.32% of good frames flagged (6 / 1,862), worst detection delay 0 ms. Thresholds 0.3–0.8 all pass, so no config change. Results, scoring rule changes, re-takes and limitations are in `docs/spike-notes.md`. One follow-up: dim light (S5) left the gate passing with 3.8× the jitter, so the framing check needs a brightness or jitter term (added to M5). Tool in `spike/` and takes in `data/spike-takes/`, neither committed. |
 | M1 Seated knee extension | **Done** (2026-11-27) | Core (`src/core`: gate, framing with side check, calibration, knee engine, cue gate, `SetSession`, summary, log build and invariants), browser edges (`src/pose`: async `PoseEngine`, `CameraSource`, `TraceSource`, watchdog), app shell (phase reducer, `SetRunner`, screens, summary and export). 111 Vitest tests, including the randomized no-cue-on-unreliable-frame test, run on synthetic traces (`fixtures/synthetic/`). Audited against the 2026-11-27 SPEC (webcam only, `full` only): `fetch-models` fetches only `full` and removes any other model file, so builds no longer ship `lite`; `PoseEngine` and the frame sources are `full`-only; trace replay refuses `lite` traces, so the app never writes `'lite'` to a log; the camera-denied help gives desktop Chrome and Safari steps instead of iPhone steps. 3 Playwright tests (fake-camera smoke, permission denied, log download) pass on the production build and are in CI. The owner's manual checks passed on 2026-11-27 on a laptop webcam in desktop Chrome (`device.clock`: `captureTime`); see **M1 manual checks** below. |
-| M2 Sit-to-stand | **Built; manual checks pending** (2026-11-27) | Core: `SetSession` now runs any `Exercise` (`src/core/exercises/exercise.ts`); knee extension is wrapped unchanged. Sit-to-stand engine with trunk-only required joints (both shoulders and hips), two-stage calibration (seated, then standing), full-cycle counting, rise and lower tempo with the four tempo cues and `STS-TEMPO-GOOD`, and a tempo summary. Config schema v2 adds `sitToStand.minStandRise`. App: sit-to-stand on the exercise list and in trace replay, its calibration and set screens, and its summary. 146 Vitest tests (32 new for M2), including the randomized no-cue-on-unreliable-frame test and log invariants re-run on synthetic sit-to-stand traces (`fixtures/synthetic/sitToStandTrace.ts`); 4 Playwright tests, one new (sit-to-stand log download). The owner's manual checks below are still to do. |
+| M2 Sit-to-stand | **Built; live re-check pending** (2026-11-28) | Core: `SetSession` now runs any `Exercise` (`src/core/exercises/exercise.ts`); knee extension is wrapped unchanged. Sit-to-stand engine with trunk-only required joints (both shoulders and hips), two-stage calibration (seated, then standing), full-cycle counting, rise and lower tempo with the four tempo cues and `STS-TEMPO-GOOD`, and a tempo summary. Config schema v2 adds `sitToStand.minStandRise`. App: sit-to-stand on the exercise list and in trace replay, its calibration and set screens, and its summary. 152 Vitest tests (38 new for M2), including the randomized no-cue-on-unreliable-frame test and log invariants re-run on synthetic sit-to-stand traces (`fixtures/synthetic/sitToStandTrace.ts`); 4 Playwright tests, one new (sit-to-stand log download). The owner's first manual set (2026-11-28) found a false repetition and six missed ones. Both were fixed the same day with the body-size guard (config schema v3), recalibration after Resume and calibration holds in either order; the set now replays to 5 of 5. A live set with the fixes is still to do (see **M2 manual checks**). |
 | M3–M8 | Not started | |
 
 ### M1 manual checks (passed 2026-11-27)
@@ -39,22 +39,31 @@ Owner decisions recorded with M1:
 - O-5: the owner confirmed that team members may record themselves, both for the spike and for the traces exported during M1–M5 manual checks. Volunteer recording is still gated. Recorded in SPEC O-5 on 2026-11-27.
 - `spike/` stays local and is not committed. Its takes go in `data/spike-takes/`, outside the folder the spike's dev server serves, and stay out of git (`data/` is ignored and checked by `check:data`).
 
-### M2 manual checks (to do)
+### M2 manual checks (first set 2026-11-28; a second set with the fixes is still to do)
 
 Run with the live camera at the 45° front-side position (SPEC O-1), on the laptop webcam in desktop Chrome, using `npm run dev`. Team members may record themselves for these checks (SPEC O-5).
 
-- [ ] **Real sets (AC 10, M2 exit).** Complete at least two sit-to-stand sets. Each full sit, stand and sit cycle adds exactly one to the counter. A deliberate half rise that does not reach standing adds nothing.
-- [ ] **Tempo (AC 11).** In one set, stand up quickly once and sit down slowly once. The matching tempo cue appears, and the summary shows the average rise and lower times against the configured ranges.
-- [ ] **Calibration headroom.** With the camera too close, standing during calibration names a shoulder at the edge of the picture and calibration does not finish. Move the camera back and it completes.
-- [ ] **Cover the camera mid-rise (AC 16, 17).** Within about 1 second the cue clears and "Can't see you well" appears. After Resume, completed reps are kept and the covered rise is not counted.
-- [ ] **Config reload (AC 14).** Change `sitToStand.reps` or `riseMs` in `public/config/targets.json` and reload; the new value takes effect.
-- [ ] **Session log.** The downloaded log is valid JSON, has `exercise: "sitToStand"` and no `side`. Keep the pose trace from one set (in `data/`, not committed): it can replace synthetic traces in the M2 tests once consent terms allow (PLANS.md §4).
+**First set, 2026-11-28.** The owner recorded one set and kept its pose trace (`data/m2-manual/`, not committed). The owner saw the app working. Replaying the trace through the core (a valid log, no invariant problems) found two counting failures, both confirmed by the owner:
+
+1. **False repetition.** At about 1:07 the owner stood up quickly, then walked toward the laptop to cover the camera. The body grew in the picture, and the shoulders dropped 240 px within a frame while every joint was still visible, so it read as sitting down and counted.
+2. **Six missed repetitions.** Covering the camera at about 2:06 tilted the laptop lid. Afterwards the whole body sat about 45 px lower in the picture at the same distance. Resume did not recalibrate, so the full stands peaked at 0.72–0.84 of standing and none counted.
+
+Fixed on 2026-11-28 by owner decision (see **Decisions** below): the body-size guard, recalibration after Resume and calibration holds accepted in either order. Replaying the same trace with the fixes gives 5 of 5 repetitions with a valid log. That replay is not a live check, because the owner was following the old prompts.
+
+- [ ] **Real sets (AC 10, M2 exit).** Complete at least two sit-to-stand sets with the fixes. Each full sit, stand and sit cycle adds exactly one to the counter. A deliberate half rise adds nothing. Walking up to the laptop while standing pauses the set instead of counting. *First set: failed on both counting points above; re-check pending.*
+- [ ] **Tempo (AC 11).** Stand up quickly once and sit down slowly once. The matching tempo cue appears, and the summary shows the average rise and lower times against the configured ranges. *First set: the fast rise and fast lower cues fired (rise 0.6 s, lower 0.8 s); no slow sit-down was recorded.*
+- [ ] **Calibration headroom.** With the camera too close, standing during calibration names a shoulder at the edge of the picture and calibration does not finish. Move the camera back and it completes. *Not shown by the trace.*
+- [x] **Cover the camera (AC 16, 17).** "Can't see you well" appeared 303 and 304 ms after the first bad frame. Completed reps were kept, and the rise in progress at the second cover was discarded. *First set.* After Resume, sit-to-stand now also repeats both calibration holds.
+- [ ] **Config reload (AC 14).** Change `sitToStand.reps` or `riseMs` in `public/config/targets.json` and reload; the new value takes effect. *Not shown by the trace.*
+- [ ] **Session log.** The downloaded log is valid JSON, has `exercise: "sitToStand"` and no `side`. *First set: only the pose trace was downloaded; a log rebuilt from it by replay validates.*
 
 **Decisions made in M2** (owner, 2026-11-27; each is recorded where it applies):
 
 - **Standing calibration** (`docs/definitions.md`): sit-to-stand calibrates seated, then standing, because the seated pose alone gives no standing height. The standing hold also checks before the set that standing fits in the frame (M0.5 S6's only false alarms were shoulders at the top edge). A new config field, `sitToStand.minStandRise`, sets the minimum shoulder rise, in seated trunk lengths, for the standing hold. Config `schemaVersion` goes from 1 to 2.
 - **Sit-to-stand summary** (AC 6): sit-to-stand measures no angle, so its summary shows tempo in place of "best angle": mean and per-repetition rise and lower times against the configured ranges.
 - **Last repetition's advice cue** (`docs/definitions.md`): if an advice condition about the final attempt holds on the frame that completes the set, counting stops and the cue is shown for `cues.displayMs` before the summary. An unreliable frame ends the set at once. Knee behaviour is unchanged.
+- **Body-size guard** (2026-11-28, from the first manual set): during the active set, a sit-to-stand frame whose shoulder width is more than `sitToStand.maxScaleChange` (default 0.3) from the calibrated width is unreliable, with gate reason `scale`. Config `schemaVersion` goes from 2 to 3 (`configVersion` 0.4-dev). Frames log `shoulderWidthPx`.
+- **Recalibration after Resume** (2026-11-28, from the first manual set): for sit-to-stand, Resume runs the short framing check and then both calibration holds again before the countdown. A resumed set can be ended during that recalibration. Knee extension is unchanged.
 
 Also in M2, not needing a decision:
 
@@ -64,8 +73,15 @@ Also in M2, not needing a decision:
 - The session log stays v2: its fields are unchanged, and it embeds the config with the config's own `schemaVersion`. The log schema validates the embedded config against the version it declares (v2, or v1 for logs recorded in M1), so the M1 manual-check log still validates and keeps its invariants. The app itself loads only config v2 (AC 15).
 - **Cue cooldown** lowered from 3000 to 1000 ms (`configVersion` 0.3-dev). Each condition episode already commits once and advice is cleared when the next attempt starts, so the cooldown only damps repeats of one rule. At 3 s it skipped the tempo cue of fast sit-to-stand reps about 2.5 s apart (a scored false negative, and AC 11 says the cue appears); 1 s is below any plausible gap between two attempts' cues and still damps a hold break that flickers within one attempt. This is a build-time default chosen without recordings (O-7); M7 tunes it on development data.
 - **SPEC §3 step 4** now says calibration is "seated and then standing" for sit-to-stand (owner approval, 2026-11-27).
+- **Calibration hold order** (2026-11-28, found by replaying the first manual set with recalibration): the first stage accepted any still pose, so a patient standing still before sitting was recorded as "seated" and calibration could never finish. The two holds are now accepted in either order, and the lower one is seated.
+- The log keeps the calibration the set started with. A recalibration after Resume shows as a `calibration` phase event; its baseline is not logged, and replaying the pose trace reproduces it. The log schema is unchanged.
+- The app reducer now records whether the set has started, so only a started set reaches the summary (calibration may now go to summary, for a resumed set).
 
-**Open points found in M2:** none left open. The cue cooldown and the SPEC §3 wording, raised during M2, were settled the same day (above).
+**Open points found in M2:**
+
+1. `maxScaleChange` 0.3 is a default chosen from one manual set: normal standing was about 1.13× the seated shoulder width, and the walk to the laptop passed 1.3× as the patient reached standing. Tune it on development data (O-7). Turning to face the camera from the 45° position also widens the shoulders and may trip it.
+2. A camera moved during the set without a pause (no tracking loss) is not detected. Only a size change is, and a tilt shifts the picture without changing size.
+3. The post-fix behaviour has been checked by replaying a recording only. The live re-check is the first item in the M2 manual checks above.
 
 **Versions recorded at scaffold:** Node 24.16 and npm 11.13 (CI uses Node 24), React 19.3, Vite 8.3, Vitest 5.1, zod 4.6, `@mediapipe/tasks-vision` 1.2.3. TypeScript is pinned to 6.0.x because typescript-eslint supports versions below 6.1 only. Added in M1: `@playwright/test` 1.65.1 (Chromium build 1255). The permission-denied test uses full Chromium in headless mode (`channel: 'chromium'`), because the headless shell answers every camera prompt with `NotSupportedError`.
 
@@ -205,7 +221,7 @@ type LogEvent =
 
 ```ts
 interface TargetsConfig {
-  schemaVersion: 2;                // v2 since M2: sitToStand.minStandRise
+  schemaVersion: 3;                // v2 (M2): sitToStand.minStandRise; v3 (M2 manual set): maxScaleChange
   configVersion: string;           // "0.x-dev" while tuning; "1.0.0-frozen" once locked (R-E9)
   tracking:    { minVisibility: number; boundsMargin: number; unreliableAfterMs: number; recoverAfterMs: number; minFps: number };
   framing:     { stableMs: number; minLuma: number };
@@ -217,7 +233,7 @@ interface TargetsConfig {
     kneeExtension: { targetFlexionAtMostDeg: number; toleranceDeg: number; holdSeconds: number; reps: number;
                      startFlexionDeg: number; reversalDeg: number };
     sitToStand:    { reps: number; riseMs: [number, number]; lowerMs: [number, number]; standFrac: number; sitFrac: number;
-                     minStandRise: number };
+                     minStandRise: number; maxScaleChange: number };
     shoulderRaise: { targetElevationDeg: number; toleranceDeg: number; reps: number; leanToleranceDeg: number;
                      resetElevationDeg: number };
   };
@@ -242,7 +258,7 @@ Phases: `loading → select → permission → framing → calibration → count
 | 1 Choose exercise | Exercise list. Side choice for knee extension and shoulder raise, with where to place the camera. | 1 |
 | 2 Start camera | `getUserMedia`. Each error type maps to a message that says how to allow access. A loading state covers the model load. | 2 |
 | 3 Framing check | Gate stable for `framing.stableMs`, frame-rate floor and side check (§3). Names what to fix, e.g. "move back so your feet are visible". "Start set" begins calibration. | 3, 19 |
-| 4 Calibration | Averages stable frames into a baseline: trunk tilt, seated shoulder height, and the knee resting angle (logged only). Sit-to-stand then asks the patient to stand still for a standing height (M2). Restarts if tracking drops or the patient moves. | 4 |
+| 4 Calibration | Averages stable frames into a baseline: trunk tilt, seated shoulder height, and the knee resting angle (logged only). Sit-to-stand then asks the patient to stand still for a standing height (M2), and repeats both holds after Resume. Restarts if tracking drops or the patient moves. | 4 |
 | 5 Countdown and set | `SetRunner` runs the per-frame pipeline below. | 5, 8–13 |
 | 6 Tracking loss | As in §3. | 16–18 |
 | 7 Summary | Repetitions, hold durations or tempo, best angle, and at least one went-well or adjust note, including for a zero-repetition set. | 6, 11 |

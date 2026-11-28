@@ -5,15 +5,16 @@ export const SET_PHASES = ['framing', 'calibration', 'countdown', 'active', 'tra
 export type SetPhase = (typeof SET_PHASES)[number];
 
 /**
- * framing → calibration (Start set) or → countdown (when resuming after tracking loss);
- * calibration → countdown (a set never starts before calibration completes, AC 4);
+ * framing → calibration (Start set, or resuming sit-to-stand) or → countdown (resuming knee extension);
+ * calibration → countdown (a set never starts before calibration completes, AC 4), or → summary
+ * when the patient ends a resumed set during its recalibration;
  * countdown → active, or back to framing if tracking drops;
  * active ⇄ trackingLost via framing (Resume → short framing check → countdown);
  * summary when the reps are done or the patient ends the set.
  */
 export const SET_TRANSITIONS: Readonly<Record<SetPhase, readonly SetPhase[]>> = {
   framing: ['calibration', 'countdown', 'summary'],
-  calibration: ['countdown'],
+  calibration: ['countdown', 'summary'],
   countdown: ['active', 'framing', 'summary'],
   active: ['trackingLost', 'summary'],
   trackingLost: ['framing', 'summary'],

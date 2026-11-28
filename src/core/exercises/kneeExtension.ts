@@ -191,6 +191,7 @@ const round1 = (v: number | null): number | null => (v === null ? null : Math.ro
 /** Seated knee extension as a SetSession exercise: side view, one leg, image-plane flexion primary. */
 export class KneeExtensionExercise implements Exercise {
   readonly id = 'kneeExtension' as const;
+  readonly recalibrateOnResume = false;
   readonly joints: readonly number[];
   private readonly engine: KneeExtensionEngine;
   private cal: Calibration;
@@ -254,6 +255,9 @@ export class KneeExtensionExercise implements Exercise {
     return { done: s.done, progress: s.progress, stage: 'seated' };
   }
 
+  checkInSet(): null {
+    return null;
+  }
   input(m: Measures): number | null {
     return m.kneeFlexion ?? null;
   }
