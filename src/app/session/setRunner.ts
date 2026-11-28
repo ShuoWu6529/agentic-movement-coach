@@ -147,6 +147,7 @@ export class SetRunner {
       holdRemainingS: same && s.holdRemainingMs !== null ? Math.ceil(s.holdRemainingMs / 100) / 10 : null,
       lastRiseS: same && s.lastRiseMs !== null ? Math.round(s.lastRiseMs / 100) / 10 : null,
       lastLowerS: same && s.lastLowerMs !== null ? Math.round(s.lastLowerMs / 100) / 10 : null,
+      finishing: same && s.finishing,
       shown: same ? s.shown : null,
       readyToResume: same && s.readyToResume,
     };

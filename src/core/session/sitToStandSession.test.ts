@@ -110,6 +110,24 @@ describe('sit-to-stand set on synthetic traces', () => {
     expect(logInvariantProblems(log)).toEqual([]);
   });
 
+  it('shows the last repetition’s tempo cue before the summary, with counting stopped', () => {
+    const cfg = withSts({ reps: 2 });
+    const { log, summary, snapshots } = run(trace([...STS_SETTLE, ...cycle(), ...cycle({ down: 1500 }), ...cycle(), { ms: 4000, p: 0 }]), cfg);
+    expect(summary.reps).toBe(2);
+    const last = cueEvents(log).find((c) => c.ruleId === 'STS-LOWER-FAST')!;
+    expect(last.attemptIndex).toBe(1);
+    const end = { t: summaryT(log) };
+    expect(end.t - last.confirmT).toBeGreaterThanOrEqual(config.cues.displayMs);
+    expect(end.t - last.confirmT).toBeLessThan(config.cues.displayMs + 100);
+    // The cue is on screen for the whole window, the counter stays at 2 and no third attempt starts.
+    const window = log.frames.filter((f) => f.t >= last.confirmT && f.t < end.t);
+    expect(window.every((f) => f.cue === 'STS-LOWER-FAST' && f.rep === 2)).toBe(true);
+    expect(attempts(log)).toHaveLength(2);
+    expect(snapshots.some((s) => s.finishing)).toBe(true);
+    expect(log.frames.at(-1)).toMatchObject({ cue: null, rep: 2 });
+    expect(logInvariantProblems(log)).toEqual([]);
+  });
+
   it('ends the set on the last repetition when it has no tempo issue, with no cue on that frame', () => {
     const { log, summary } = run(trace([...STS_SETTLE, ...cycle(), ...cycle(), { ms: 4000, p: 0 }]), withSts({ reps: 2 }));
     expect(summary.reps).toBe(2);
@@ -118,6 +136,16 @@ describe('sit-to-stand set on synthetic traces', () => {
     expect(end.t).toBe(lastAttempt.t);
     expect(cueEvents(log).map((c) => c.attemptIndex)).toEqual([0]); // no positive cue for the final rep
     expect(log.frames.at(-1)).toMatchObject({ cue: null, rep: 2 });
+  });
+
+  it('ends the final-cue window at once when tracking drops, with no cue on the unreliable frame (R-S1)', () => {
+    const cfg = withSts({ reps: 1 });
+    const { log } = run(trace([...STS_SETTLE, ...cycle({ down: 1500, sit: 300 }), { ms: 2000, noPose: true }]), cfg);
+    const last = cueEvents(log).find((c) => c.ruleId === 'STS-LOWER-FAST')!;
+    const end = { t: summaryT(log) };
+    expect(end.t - last.confirmT).toBeLessThan(config.cues.displayMs);
+    expect(log.frames.at(-1)).toMatchObject({ trackingOk: false, cue: null });
+    expect(logInvariantProblems(log)).toEqual([]);
   });
 
   it('changes the count and the tempo cues with the config, not the code (AC 14)', () => {

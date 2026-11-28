@@ -259,6 +259,7 @@ function Hud({
               </div>
             </dl>
           )}
+          {view?.finishing && <p role="status" className={styles.message}>Set complete.</p>}
           <p role="status" aria-label="Feedback" className={`${styles.cue} ${rule?.kind === 'positive' ? styles.positive : ''}`}>
             {rule && rule.kind !== 'status' ? rule.text : ' '}
           </p>

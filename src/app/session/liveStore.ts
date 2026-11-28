@@ -28,6 +28,8 @@ export interface LiveView {
   lastLowerS: number | null;
   shown: RuleId | null;
   readyToResume: boolean;
+  /** The last repetition is done and its final cue is on screen. */
+  finishing: boolean;
 }
 
 const THROTTLE_MS = 100;
@@ -38,7 +40,8 @@ function sameDiscrete(a: LiveView, b: LiveView): boolean {
     a.canStart === b.canStart && a.countdownRemainingS === b.countdownRemainingS && a.reps === b.reps &&
     a.shown === b.shown && a.readyToResume === b.readyToResume && (a.holdRemainingS === null) === (b.holdRemainingS === null) &&
     (a.angle === null) === (b.angle === null) && a.calibrationStage === b.calibrationStage &&
-    a.calibrationText === b.calibrationText && a.lastRiseS === b.lastRiseS && a.lastLowerS === b.lastLowerS
+    a.calibrationText === b.calibrationText && a.lastRiseS === b.lastRiseS && a.lastLowerS === b.lastLowerS &&
+    a.finishing === b.finishing
   );
 }
 

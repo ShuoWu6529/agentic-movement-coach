@@ -1,6 +1,6 @@
 # Definitions (v1, draft)
 
-Status: draft, v0 written in M0, extended in M1 (knee attempt end, attempt indices, tracking reliability, cue conditions) and M2 (sit-to-stand calibration, progress, tempo, cue conditions). These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (PLANS.md §10). Items marked **(confirm)** are working assumptions (PLANS.md §11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
+Status: draft, v0 written in M0, extended in M1 (knee attempt end, attempt indices, tracking reliability, cue conditions) and M2 (sit-to-stand calibration, progress, tempo, cue conditions, the last repetition's cue). These definitions decide what counts in manual counts, therapist labels and scoring, so they must be settled before M7 (PLANS.md §10). Items marked **(confirm)** are working assumptions (PLANS.md §11) to check with the therapist once one is recruited (O-4). Numbers in `code` are config fields in `public/config/targets.json`. Their values are tuned on development data only (R-E9).
 
 ## Angle conventions
 
@@ -88,7 +88,7 @@ Every cue passes through one cue gate (PLANS.md §2). A condition must hold for 
 | `KE-HOLD-BREAK` | advice | From the frame a running hold breaks, until the knee re-enters the band, the hold completes, or the next attempt starts | The attempt whose hold broke |
 | `KE-HOLD-DONE` | positive | The frame a hold completes and the repetition is counted (an event, no dwell) | The counted attempt |
 
-A cue that would commit on the frame that completes the last repetition is not shown or logged, because the summary replaces the set screen on that frame. So the final `KE-HOLD-DONE` of a completed set has no cue event.
+A cue that would commit on the frame that completes the last repetition is not shown or logged, because the summary replaces the set screen on that frame. So the final `KE-HOLD-DONE` of a completed set has no cue event. The exception is advice about the final attempt (M2): if an advice condition holds on that frame, counting stops and the set screen stays up until that cue has been shown for `cues.displayMs`, or until it can no longer be shown (blocked by `cues.cooldownMs`). An unreliable frame ends the set at once. No knee rule holds on that frame, so knee behaviour is unchanged; for sit-to-stand it lets the last repetition's lower-tempo cue appear (AC 11).
 
 `KE-RANGE-LOW` is tied to the end of the attempt on purpose: it never fires during an attempt that later reaches the target, so per-attempt scoring (O-8) is not penalized for a patient who is still moving. Its feedback delay therefore includes the configured dwell.
 

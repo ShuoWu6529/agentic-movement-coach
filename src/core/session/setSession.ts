@@ -9,6 +9,10 @@
 // - In trackingLost, only status messages show. After `tracking.recoverAfterMs` of reliable frames the
 //   patient may Resume, which runs a short framing check and the countdown. Completed reps are kept.
 // - Losing tracking in calibration restarts calibration; in the countdown it returns to framing.
+// - The frame that completes the last repetition ends the set, unless an advice condition about the
+//   final attempt holds on it (a sit-to-stand lowered too fast, say). Then counting stops and the set
+//   screen stays up until that cue has been shown for `cues.displayMs` (or can no longer be shown),
+//   and an unreliable frame ends it at once (docs/definitions.md).
 
 import type { Baseline } from '../calibration';
 import type { TargetsConfig } from '../config/schema';
@@ -63,6 +67,8 @@ export interface SetSnapshot {
   shown: RuleId | null;
   commit: CueCommit | null;
   readyToResume: boolean;
+  /** True after the last repetition while its final advice cue is on screen. */
+  finishing: boolean;
 }
 
 export interface SetResult {
@@ -95,6 +101,8 @@ export class SetSession {
   private goodSince: number | null = null;
   private ready = false;
   private trackingLosses = 0;
+  /** Advice conditions held on the frame that completed the last repetition, still to be shown. */
+  private finalCues: CueCandidate[] | null = null;
 
   private readonly frames: FrameRow[] = [];
   private readonly events: LogEvent[] = [];
@@ -179,6 +187,7 @@ export class SetSession {
         }
         break;
       case 'active':
+        if (this.finalCues) break; // counting has stopped after the last repetition
         if (value === null) {
           this.badSince ??= t;
           const kept = ex.discard(t);
@@ -213,19 +222,46 @@ export class SetSession {
     }
 
     const lost = this.phaseNow === 'trackingLost';
-    // The frame that completes the last repetition ends the set: the summary replaces the set screen
-    // at once, so no cue is committed on it (a cue that never reaches the display is not logged).
-    const finishNow = this.phaseNow === 'active' && ex.reps >= ex.targetReps;
-    const open = this.phaseNow === 'active' && value !== null && !finishNow;
+    const usable = this.phaseNow === 'active' && value !== null;
+    let open = false;
+    let conditions: CueCandidate[] = [];
+    let finishNow = false;
+    if (this.phaseNow === 'active') {
+      if (this.finalCues) {
+        open = usable;
+        conditions = usable ? this.finalCues : [];
+        finishNow = !usable;
+      } else if (ex.reps >= ex.targetReps) {
+        // The frame that completes the last repetition. Positive feedback is not shown on it, because
+        // the summary replaces the set screen; advice about the final attempt is shown first.
+        const final = ex.conditions();
+        if (final.length > 0) {
+          this.finalCues = final;
+          open = true;
+          conditions = final;
+        } else {
+          finishNow = true;
+        }
+        events = [];
+      } else {
+        open = usable;
+        conditions = open ? ex.conditions() : [];
+      }
+    }
     const out = this.cueGate.step(t, {
-      open,
-      conditions: open ? ex.conditions() : [],
+      open: open && !finishNow,
+      conditions,
       events: open ? events : [],
       status: lost ? (this.ready ? 'ST-READY-RESUME' : 'ST-TRACKING-LOST') : null,
       attemptStarted: open ? attemptStarted : null,
     });
-    const shown = out.shown;
-    const commit = out.commit;
+    if (this.finalCues && !finishNow) {
+      const waiting = this.finalCues.some((c) => this.cueGate.isPending(c) || c.ruleId === out.shown);
+      finishNow = !waiting;
+    }
+    // A frame that ends the set shows no cue: the summary replaces the set screen on it.
+    const shown = finishNow ? null : out.shown;
+    const commit = finishNow ? null : out.commit;
     if (commit) {
       const c = commit;
       const ev = { type: 'cue' as const, ruleId: c.ruleId, attemptIndex: c.attemptIndex, onsetT: c.onsetT, confirmT: c.confirmT, shownAt: c.confirmT };
@@ -244,6 +280,7 @@ export class SetSession {
       rep: ex.reps,
     });
 
+    const finishing = this.finalCues !== null && !finishNow;
     if (finishNow) this.finish(t);
 
     const live = this.phaseNow === 'active' ? ex.live(open ? value : null) : null;
@@ -272,6 +309,7 @@ export class SetSession {
       shown,
       commit,
       readyToResume: lost && this.ready,
+      finishing,
     };
     return this.last;
   }
@@ -339,6 +377,7 @@ export class SetSession {
   private finish(t: number): void {
     const kept = this.ex.discard(t);
     if (kept) this.recordAttempt(kept);
+    this.finalCues = null;
     this.setPhase('summary', t);
     this.summary = this.ex.summary(this.attempts, this.trackingLosses);
   }

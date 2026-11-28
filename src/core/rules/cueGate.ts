@@ -104,6 +104,12 @@ export class CueGate {
     return { shown: this.current?.ruleId ?? null, commit };
   }
 
+  /** True while a condition is waiting out its dwell and may still commit. */
+  isPending(c: CueCandidate): boolean {
+    const p = this.pending.get(key(c));
+    return p !== undefined && !p.done;
+  }
+
   /** Advice rules have a configured dwell (the schema requires it). Other kinds respond to events. */
   private dwell(ruleId: RuleId): number {
     return this.cfg.dwellMs[ruleId] ?? 0;
