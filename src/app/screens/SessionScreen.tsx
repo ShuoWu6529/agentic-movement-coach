@@ -23,8 +23,10 @@ export function SessionScreen({ state, deps, dispatch }: { state: SessionState; 
   useEffect(() => {
     let cancelled = false;
     let runner: SetRunner | null = null;
+    const src = selection.source;
+    // A trace the app refuses (openTrace throws) becomes a rejected promise, handled like a camera error.
     const open =
-      selection.source.kind === 'camera' ? deps.openCamera() : Promise.resolve(deps.openTrace(selection.source.trace));
+      src.kind === 'camera' ? deps.openCamera() : new Promise<FrameSource>((resolve) => resolve(deps.openTrace(src.trace)));
     open.then(
       (source) => {
         if (cancelled) {

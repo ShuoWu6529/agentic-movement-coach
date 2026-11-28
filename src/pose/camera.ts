@@ -23,7 +23,7 @@ function measureLuma(video: HTMLVideoElement, ctx: CanvasRenderingContext2D): nu
   }
 }
 
-export async function openCamera(createEngine: () => Promise<PoseEngine> = () => createPoseEngine('full')): Promise<FrameSource> {
+export async function openCamera(createEngine: () => Promise<PoseEngine> = createPoseEngine): Promise<FrameSource> {
   if (!window.isSecureContext) throw new CameraStartError('insecure');
   if (!navigator.mediaDevices?.getUserMedia) throw new CameraStartError('unsupported');
 

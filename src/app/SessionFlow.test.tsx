@@ -181,6 +181,17 @@ describe('knee extension set in the app', () => {
     expect(await screen.findByLabelText('Repetitions completed')).toHaveTextContent('1 /');
   });
 
+  it('rejects a trace recorded with the "lite" model (SPEC R-F1)', async () => {
+    serveConfig();
+    const user = userEvent.setup();
+    render(<App />);
+    const trace = { ...kneeTrace({ side: 'left', segments: [...SETTLE] }), model: { variant: 'lite', delegate: 'GPU' } };
+    await user.click(await screen.findByText(/replay a recorded pose trace/i));
+    await user.upload(screen.getByLabelText(/pose trace file/i), new File([JSON.stringify(trace)], 'lite.json', { type: 'application/json' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/"full" model only/);
+    expect(screen.getByRole('button', { name: /replay trace/i })).toBeDisabled();
+  });
+
   it('rejects a file that is not a pose trace', async () => {
     serveConfig();
     const user = userEvent.setup();

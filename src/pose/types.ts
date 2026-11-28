@@ -10,7 +10,8 @@ export interface SourceInfo {
   /** Frame size in pixels, for image-plane angles and the overlay. */
   size: { width: number; height: number };
   camera: { w: number; h: number; fps: number };
-  model: { variant: 'full' | 'lite'; delegate: 'GPU' | 'CPU' };
+  /** v1 runs the "full" model only (SPEC R-F1). The log and trace schemas still accept 'lite'. */
+  model: { variant: 'full'; delegate: 'GPU' | 'CPU' };
   /** Which clock frame `t` comes from; known after the first frame for a camera. */
   clock(): ClockKind;
 }

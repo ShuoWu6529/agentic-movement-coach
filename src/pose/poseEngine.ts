@@ -1,4 +1,6 @@
 // PoseEngine (R-F1, PLANS.md §2 principle 4): MediaPipe PoseLandmarker in VIDEO mode, on the device.
+// The "full" model only: there is no lighter fallback (SPEC R-F1, O-6). A device too slow for it fails
+// the framing check on frame rate.
 // `detect` is async from day one so inference can move to a worker without changing callers.
 // Model and wasm are self-hosted under BASE_URL (C-2): no third-party requests at runtime.
 
@@ -11,7 +13,7 @@ export interface PoseResult {
 }
 
 export interface PoseEngine {
-  readonly variant: 'full' | 'lite';
+  readonly variant: 'full';
   readonly delegate: 'GPU' | 'CPU';
   detect(frame: HTMLVideoElement, timestampMs: number): Promise<PoseResult | null>;
   close(): void;
@@ -19,7 +21,8 @@ export interface PoseEngine {
 
 const BASE = import.meta.env.BASE_URL;
 
-export async function createPoseEngine(variant: 'full' | 'lite' = 'full'): Promise<PoseEngine> {
+export async function createPoseEngine(): Promise<PoseEngine> {
+  const variant = 'full';
   const fileset = await FilesetResolver.forVisionTasks(`${BASE}wasm`);
   const create = (delegate: 'GPU' | 'CPU') =>
     PoseLandmarker.createFromOptions(fileset, {

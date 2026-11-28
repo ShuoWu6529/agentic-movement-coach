@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PoseTraceSchema } from '../../core/trace/schema';
+import { unsupportedTraceReason } from '../../pose/traceSource';
 import type { Side } from '../../core/types';
 import { EXERCISE_INFO } from '../exercises';
 import type { Selection } from '../session/phase';
@@ -65,6 +66,11 @@ function TraceReplay({ onChoose }: { onChoose: (s: Selection) => void }) {
     if (!r.success) {
       const i = r.error.issues[0]!;
       setError(`Not a pose trace (v1): ${i.path.join('.') || '(root)'}: ${i.message}`);
+      return;
+    }
+    const unsupported = unsupportedTraceReason(r.data);
+    if (unsupported) {
+      setError(unsupported);
       return;
     }
     setLoaded({ name: file.name, trace: { kind: 'trace', name: file.name, trace: r.data } });
