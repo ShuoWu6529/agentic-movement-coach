@@ -14,7 +14,7 @@ npm run dev
 Open http://localhost:5173, choose an exercise, and allow camera access.
 
 - **Seated knee extension:** choose the leg, and place the camera to your side so that leg is nearer to it.
-- **Sit-to-stand:** place the camera in front of you, turned about 45° to one side, far enough back that your head and shoulders stay in the picture when you stand. Calibration asks you to sit still, then stand still; sit down again during the countdown.
+- **Sit-to-stand:** place the camera in front of you, turned about 45° to one side, far enough back that your head and shoulders stay in the picture when you stand. Calibration asks you to sit still, then stand still; sit down again during the countdown. After the camera loses sight of you, Resume repeats this calibration, in case the camera moved.
 
 v1 supports a laptop or desktop webcam only, not phones or tablets.
 
