@@ -1,5 +1,4 @@
 /// <reference types="vitest/config" />
-import basicSsl from '@vitejs/plugin-basic-ssl';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -24,16 +23,15 @@ function gitSha(): string {
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 // `base: './'` keeps every asset URL relative, so the build works from any static host or subpath (O-12).
-// `npm run dev:https` (mode "https") serves over a self-signed certificate on the LAN, because
-// phones only allow camera access in a secure context.
-export default defineConfig(({ mode }) => ({
+// The dev server stays on localhost: v1 is webcam only (SPEC C-1), and localhost is a secure context for the camera.
+export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __GIT_SHA__: JSON.stringify(gitSha()),
   },
-  plugins: [react(), ...(mode === 'https' ? [basicSsl()] : [])],
-  server: { host: mode === 'https' ? true : 'localhost' },
+  plugins: [react()],
+  server: { host: 'localhost' },
   test: {
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
@@ -41,4 +39,4 @@ export default defineConfig(({ mode }) => ({
     environmentOptions: { jsdom: { pretendToBeVisual: true } },
     css: { modules: { classNameStrategy: 'non-scoped' } },
   },
-}));
+});

@@ -15,7 +15,7 @@ This is a small feasibility pilot. It is **not** a clinically validated product,
 
 | User | Role in v1 |
 |---|---|
-| **Patient at home** (primary) | Does prescribed exercises alone in front of a webcam or phone camera and receives live feedback. |
+| **Patient at home** (primary) | Does prescribed exercises alone in front of a laptop or desktop webcam and receives live feedback. |
 | **Therapist** (secondary) | Sets per-exercise targets in a config file or simple settings form. Does not use a portal. Also assesses recorded sets for the evaluation. |
 | **Research team** (evaluation) | Records consented test videos, labels them, runs the offline scoring script and writes the report. |
 
@@ -46,7 +46,7 @@ Build order: R-EX1, then R-EX2, then R-EX3. Each must work end to end before the
 
 ### 4.2 Functional requirements
 
-- **R-F1 Pose tracking.** Run an existing pose-estimation model (MediaPipe pose landmarker) in the browser on live camera input. Start with the "full" variant and fall back to "lite" when the frame rate drops; log which variant was used. No custom model training.
+- **R-F1 Pose tracking.** Run an existing pose-estimation model (MediaPipe pose landmarker, "full" variant) in the browser on live camera input, and log the variant and delegate used. There is no fallback to a lighter variant: on a device too slow for "full", the framing check fails on frame rate and no set can start. No custom model training.
 - **R-F2 Metrics.** Compute joint angles, repetition counts, hold durations, tempo and trunk lean from landmarks.
 - **R-F3 Therapist targets.** Read per-exercise targets from a JSON config: target angle, hold seconds, repetition count, tempo range, and tolerances. A simple in-app settings form edits the same values, and the form and the JSON file stay interchangeable (the form can load and export the JSON). Changing targets changes the feedback without code changes.
 - **R-F4 Rule-based feedback.** Generate short text cues from rules comparing metrics with targets. Every cue carries a stable rule ID.
@@ -95,7 +95,7 @@ Build order: R-EX1, then R-EX2, then R-EX3. Each must work end to end before the
 
 ## 5. Constraints
 
-- **C-1 Platform:** browser web app (React + Vite, TypeScript) that runs on a laptop webcam or phone camera. No native app. The offline scoring script is written in Python.
+- **C-1 Platform:** browser web app (React + Vite, TypeScript) that runs on a laptop or desktop computer with a webcam. Phones and tablets are not supported in v1 (owner decision, 2026-11-27). No native app. The offline scoring script is written in Python.
 - **C-2 Privacy:** pose estimation runs on-device. Live camera video is not uploaded. No accounts and no backend in v1.
 - **C-3 Model:** use an existing pose-estimation model; no training or fine-tuning.
 - **C-4 Consent and data handling:** recordings are made only with informed, documented consent. Stored videos and labels stay access-controlled and are shared only as the consent allows.
@@ -110,7 +110,7 @@ Build order: R-EX1, then R-EX2, then R-EX3. Each must work end to end before the
 - Learning targets from a therapist's demonstration.
 - Spoken or audio feedback.
 - A full in-app recording, labeling, or reporting interface (only a minimal observer-note field in the export).
-- Native iOS or Android apps.
+- Native iOS or Android apps, and running the web app on phones or tablets.
 - Multi-session history, progress charts, or reminders.
 - Exercises other than the three listed.
 - Any diagnosis, prescription, clinical claims, or regulatory submission.
@@ -177,7 +177,7 @@ Each criterion is checked by observing the running app, the exported data, or th
 | O-1 | Camera position per exercise | Side view for knee extension, 45° front-side for sit-to-stand, front for shoulder raises. The robustness test adds at least one alternate position per exercise. |
 | O-2 | Feedback latency target | Median 300 ms or less from movement to on-screen cue; worst case also reported. |
 | O-3 | Independent angle reference | Goniometer or inclinometer readings at held poses. Who takes the measurements is still open (see O-4). |
-| O-6 | Pose model variant | MediaPipe "full" by default, falling back to "lite" on slow devices, with the variant logged. Minimum device spec to be recorded after first device tests. |
+| O-6 | Pose model variant | MediaPipe "full" only, with the variant logged. The "lite" fallback was dropped on 2026-11-27 by the owner. Supporting it would mean measuring the reliability gate on "lite" too, and "full" runs in about 11 ms per frame on the laptop tested. A device too slow for "full" cannot pass the framing check. Minimum device spec to be recorded after first device tests. |
 | O-7 | Rule definitions and thresholds | Defaults live in the config, are tuned on development recordings only, then frozen and versioned before the test set is scored. The specific values are set during the build. |
 | O-8 | Feedback scoring unit | Per attempt: the therapist labels issues in each attempt (one movement cycle, counted or not), and app cues are matched against those labels. Changed from "per repetition" on 2026-11-24, because an attempt that never reaches the target is not a repetition, so its insufficient-range issue could not be scored per repetition. |
 | O-9 | Tech stack | React + Vite (TypeScript) web app; Python offline scoring script. Hosting is not chosen; any static host works since there is no backend. |
@@ -190,4 +190,4 @@ Each criterion is checked by observing the running app, the exported data, or th
 |---|---|---|---|
 | O-4 | **Volunteers and therapist:** 2–3 volunteers (one test-only) and one physical therapist are not yet recruited. Also: who takes the goniometer readings, and whether the therapist authors the targets. | Required for acceptance criteria 22 and 23. | No recording until settled. |
 | O-5 | **Consent and ethics route:** not started. Institutional IRB or equivalent, consent form wording, video retention, and sharing terms. The wording must also cover derived skeleton data (landmark traces), and whether team members recording themselves for the M0.5 spike counts as recording. | Gates any recording of people and any release of the videos or traces (PLANS.md §4). | Hard gate: no recording of volunteers until settled. |
-| O-12 | **Hosting for the demo** (e.g. a static host) and the minimum supported phone and browser. | Affects how reviewers run the demo (criterion 28). | Before the demo is shared. |
+| O-12 | **Hosting for the demo** (e.g. a static host) and the minimum supported computer and browser. | Affects how reviewers run the demo (criterion 28). | Before the demo is shared. |
