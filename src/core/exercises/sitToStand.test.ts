@@ -175,6 +175,15 @@ describe('sit-to-stand calibration', () => {
     expect(calibrate([{ ms: 2500, p: 0 }, { ms: 600, from: 0, to: 0.3 }, { ms: 4000, p: 0.3 }], cfg).ex.calibration).not.toBeNull();
   });
 
+  it('accepts the holds in either order: standing still first, then seated, is still calibrated', () => {
+    // After walking back to the chair, the patient stands still for a moment before sitting down.
+    const { ex } = calibrate([{ ms: 2500, p: 1 }, { ms: 1500, from: 1, to: 0 }, { ms: 2500, p: 0 }]);
+    const b = ex.calibration!.baseline;
+    expect(b.seatedShoulderY).toBeCloseTo(220, 0);
+    expect(b.standingShoulderY).toBeCloseTo(124, 0);
+    expect(b.trunkPx).toBeCloseTo(120, 0);
+  });
+
   it('starts again from the seated stage after a reset', () => {
     const cal = new SitToStandCalibration(config.calibration, sts.minStandRise);
     const ex = new SitToStandExercise(config, video);

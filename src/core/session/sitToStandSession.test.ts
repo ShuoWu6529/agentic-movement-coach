@@ -212,6 +212,13 @@ describe('sit-to-stand set on synthetic traces', () => {
     expect(result!.calibration.t).toBeLessThan(log.events.find((e) => e.type === 'tracking_lost')!.t);
   });
 
+  it('calibrates and counts when the patient stands still before sitting down for calibration', () => {
+    const standFirst: StsSegment[] = [{ ms: 1200, p: 1 }, { ms: 2500, p: 1 }, { ms: 1500, from: 1, to: 0 }, { ms: 6000, p: 0 }];
+    const { summary, result } = run(trace([...standFirst, ...cycle(), ...cycle()]));
+    expect(result!.calibration.baseline.seatedShoulderY).toBeGreaterThan(result!.calibration.baseline.standingShoulderY!);
+    expect(summary.reps).toBe(2);
+  });
+
   it('does not count a stand followed by walking toward the camera, which looks like sitting down', () => {
     // As in the owner's manual set: stand up, then walk to the laptop. The body grows in the picture,
     // then the shoulders drop within a frame or two while every joint is still visible, then no pose.
