@@ -158,6 +158,23 @@ describe('sit-to-stand set on synthetic traces', () => {
     expect(attempts(strict.log).every((a) => a.issues.includes('too_fast'))).toBe(true);
   });
 
+  it('cues every fast repetition when reps come 2.5 s apart, which the old 3 s cooldown would skip', () => {
+    const fast = { up: 900, stand: 100, down: 1300, sit: 200 }; // rise ≈ 0.6 s, lower ≈ 0.85 s
+    const t = trace([...STS_SETTLE, ...cycle(fast), ...cycle(fast), ...cycle(fast), ...cycle(fast), { ms: 3000, p: 0 }]);
+    const perAttempt = (cfg: TargetsConfig) => {
+      const { log } = run(t, withSts({ reps: 10 }, cfg));
+      const rules = (id: string) => cueEvents(log).filter((c) => c.ruleId === id).map((c) => c.attemptIndex);
+      return { attempts: attempts(log).length, rise: rules('STS-RISE-FAST'), lower: rules('STS-LOWER-FAST') };
+    };
+    const now = perAttempt(config);
+    expect(now.attempts).toBe(4);
+    expect(now.rise).toEqual([0, 1, 2, 3]);
+    expect(now.lower).toEqual([0, 1, 2, 3]);
+    const old = structuredClone(config);
+    old.cues.cooldownMs = 3000;
+    expect(perAttempt(old).rise.length).toBeLessThan(4);
+  });
+
   it('pauses within unreliableAfterMs, discards the rise in progress and keeps completed reps (AC 16, 17)', () => {
     const { log, summary } = run(trace([...STS_SETTLE, ...cycle(),
       { ms: 1500, from: 0, to: 0.7 }, { ms: 1500, noPose: true }, { ms: 1500, p: 0 }, // covered mid-rise

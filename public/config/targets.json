@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "configVersion": "0.2-dev",
+  "configVersion": "0.3-dev",
   "tracking": {
     "minVisibility": 0.5,
     "boundsMargin": 0.02,
@@ -13,7 +13,7 @@
   "smoothing": { "kind": "ema", "alpha": 0.5 },
   "cues": {
     "displayMs": 2500,
-    "cooldownMs": 3000,
+    "cooldownMs": 1000,
     "dwellMs": {
       "KE-RANGE-LOW": 300,
       "KE-HOLD-BREAK": 200,
