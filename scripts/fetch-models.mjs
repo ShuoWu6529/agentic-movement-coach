@@ -1,10 +1,13 @@
-// Downloads the pinned MediaPipe pose models into public/models/ and copies the wasm runtime
+// Downloads the pinned MediaPipe pose model into public/models/ and copies the wasm runtime
 // from the npm package into public/wasm/, so the app makes no third-party requests at runtime (C-2).
 // Idempotent: a model that is already present with the pinned sha256 is not downloaded again.
 // A checksum mismatch fails the script, so an upstream model change can't slip in silently.
+// v1 runs the "full" model only (SPEC R-F1, O-6, 2026-11-27). Any other model file left in
+// public/models/ (such as the "lite" model earlier versions fetched) is removed, so a build never
+// ships a model the app does not use.
 
 import { createHash } from 'node:crypto';
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,11 +22,6 @@ const MODELS = [
     file: 'pose_landmarker_full.task',
     url: `${BASE}/pose_landmarker_full/float16/latest/pose_landmarker_full.task`,
     sha256: '4eaa5eb7a98365221087693fcc286334cf0858e2eb6e15b506aa4a7ecdcec4ad',
-  },
-  {
-    file: 'pose_landmarker_lite.task',
-    url: `${BASE}/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task`,
-    sha256: '59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a',
   },
 ];
 
@@ -42,6 +40,13 @@ await cp(join(root, 'node_modules/@mediapipe/tasks-vision/wasm'), join(pub, 'was
 console.log('fetch-models: wasm copied to public/wasm');
 
 await mkdir(join(pub, 'models'), { recursive: true });
+const pinned = new Set(MODELS.map((m) => m.file));
+for (const name of await readdir(join(pub, 'models'))) {
+  if (!pinned.has(name)) {
+    await rm(join(pub, 'models', name), { recursive: true, force: true });
+    console.log(`fetch-models: removed unused ${name}`);
+  }
+}
 for (const m of MODELS) {
   const path = join(pub, 'models', m.file);
   const existing = await readIfPresent(path);

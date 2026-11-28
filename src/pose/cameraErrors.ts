@@ -41,7 +41,7 @@ export function cameraErrorText(kind: CameraErrorKind): { title: string; help: s
         title: 'Camera access was denied.',
         help:
           'To allow it, click the camera or lock icon in the address bar, set Camera to Allow, then press Try again. ' +
-          'On an iPhone or iPad, open Settings → Safari → Camera and choose Allow, then reload this page.',
+          'In Safari on a Mac, open Safari → Settings for This Website, set Camera to Allow, then reload this page.',
       };
     case 'notFound':
       return { title: 'No camera was found.', help: 'Connect a camera or check that it is turned on, then press Try again.' };

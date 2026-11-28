@@ -11,7 +11,16 @@ function medianFps(trace: PoseTrace): number {
   return m ? Math.round(1000 / m) : 0;
 }
 
+/** v1 replays only traces from the "full" model, the only one the gate was measured on (SPEC R-F1, O-6). */
+export function unsupportedTraceReason(trace: PoseTrace): string | null {
+  return trace.model.variant === 'full'
+    ? null
+    : `This trace was recorded with the "${trace.model.variant}" model. v1 supports the "full" model only.`;
+}
+
 export function openTrace(trace: PoseTrace, opts: { speed?: number } = {}): FrameSource {
+  const unsupported = unsupportedTraceReason(trace);
+  if (unsupported) throw new Error(unsupported);
   const speed = opts.speed ?? 1;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running = false;
@@ -20,7 +29,7 @@ export function openTrace(trace: PoseTrace, opts: { speed?: number } = {}): Fram
       kind: 'trace',
       size: { width: trace.video.width, height: trace.video.height },
       camera: { w: trace.video.width, h: trace.video.height, fps: medianFps(trace) },
-      model: trace.model,
+      model: { variant: 'full', delegate: trace.model.delegate },
       clock: () => 'trace',
     },
     video: null,
