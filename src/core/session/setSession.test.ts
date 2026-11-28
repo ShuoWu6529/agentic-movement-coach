@@ -82,6 +82,21 @@ describe('set session on synthetic traces', () => {
     }
   });
 
+  it('clears an insufficient-range cue when the next attempt starts, so it never shows at the target (AC 9)', () => {
+    // A short attempt, then a quick second lift that reaches the band well within cues.displayMs of the cue.
+    const { log } = run(trace([...SETTLE, ...extension(25, 1500, { lowerMs: 800, restMs: 100 }), ...extension(5, 3500, { liftMs: 600 })]));
+    const cue = cueEvents(log).find((c) => c.ruleId === 'KE-RANGE-LOW');
+    expect(cue?.attemptIndex).toBe(0);
+    const next = log.events.find((e) => e.type === 'attempt' && e.index === 1) as { tStart: number } | undefined;
+    expect(next).toBeDefined();
+    expect(next!.tStart - cue!.confirmT).toBeLessThan(config.cues.displayMs); // the cue would still be up without the fix
+    const shown = log.frames.filter((f) => f.cue === 'KE-RANGE-LOW');
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every((f) => f.t < next!.tStart)).toBe(true);
+    const band = config.exercises.kneeExtension.targetFlexionAtMostDeg + config.exercises.kneeExtension.toleranceDeg;
+    expect(shown.every((f) => (f.angles.kneeFlexion ?? Infinity) > band)).toBe(true);
+  });
+
   it('cues a broken hold', () => {
     const { log } = run(trace([...SETTLE, { ms: 1200, from: 90, to: 8 }, { ms: 1500, flexion: 8 }, { ms: 300, from: 8, to: 25 },
       { ms: 1000, flexion: 25 }, { ms: 1000, from: 25, to: 90 }, { ms: 800, flexion: 90 }]));

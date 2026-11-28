@@ -139,6 +139,7 @@ export class SetSession {
     let framing: FramingStatus | null = null;
     let calibrationProgress = 0;
     const events: CueCandidate[] = [];
+    let attemptStarted: number | null = null;
 
     switch (this.phaseNow) {
       case 'framing':
@@ -186,6 +187,7 @@ export class SetSession {
         } else {
           this.badSince = null;
           const r = this.engine.step(t, flexion);
+          attemptStarted = r.startedAttempt;
           if (r.ended) this.recordAttempt(r.ended);
           if (r.repCounted) events.push({ ruleId: 'KE-HOLD-DONE', attemptIndex: r.countedAttempt });
           this.bestFlexion = this.bestFlexion === null ? flexion : Math.min(this.bestFlexion, flexion);
@@ -215,6 +217,7 @@ export class SetSession {
       conditions: open ? this.engine.conditions() : [],
       events: open ? events : [],
       status: lost ? (this.ready ? 'ST-READY-RESUME' : 'ST-TRACKING-LOST') : null,
+      attemptStarted: open ? attemptStarted : null,
     });
     if (out.commit) {
       const c = out.commit;

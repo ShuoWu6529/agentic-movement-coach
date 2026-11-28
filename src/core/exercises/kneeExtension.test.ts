@@ -35,6 +35,16 @@ describe('knee extension engine', () => {
     expect(e.reps).toBe(1);
   });
 
+  it('reports the frame on which each attempt starts', () => {
+    const e = new KneeExtensionEngine(ke);
+    expect(e.step(0, 90).startedAttempt).toBeNull(); // reset → rest
+    expect(e.step(33, 70).startedAttempt).toBeNull(); // still above startFlexionDeg
+    expect(e.step(66, ke.startFlexionDeg - 1).startedAttempt).toBe(0);
+    expect(e.step(100, 40).startedAttempt).toBeNull(); // same attempt continues
+    e.step(133, 90); // back to rest: attempt 0 ends
+    expect(e.step(166, ke.startFlexionDeg - 1).startedAttempt).toBe(1);
+  });
+
   it('shows the hold counting down while the knee stays in the band', () => {
     const e = new KneeExtensionEngine(ke);
     run(e, [[0, 90], [1000, 90], [2000, 8], [3000, 8]]);

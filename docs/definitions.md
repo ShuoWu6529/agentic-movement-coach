@@ -69,7 +69,7 @@ The config loader rejects values that would make these definitions impossible:
 
 ## Cue conditions (seated knee extension)
 
-Every cue passes through one cue gate (PLANS.md §2). A condition must hold for its `cues.dwellMs` before the cue is shown. Each episode of a condition shows its cue at most once, the same rule is not shown again within `cues.cooldownMs`, and a cue stays up for `cues.displayMs` or until replaced. Advice wins over positive feedback on the same frame.
+Every cue passes through one cue gate (PLANS.md §2). A condition must hold for its `cues.dwellMs` before the cue is shown. Each episode of a condition shows its cue at most once, the same rule is not shown again within `cues.cooldownMs`, and a cue stays up for `cues.displayMs` or until replaced. When a new attempt starts, an advice cue about an earlier attempt is cleared at once, so advice is never on screen during an attempt it does not describe (for example "straighten more" while the next attempt is already at the target, AC 9). Positive feedback is not cleared this way. Advice wins over positive feedback on the same frame.
 
 | Rule ID | Kind | Condition holds | `attemptIndex` |
 |---|---|---|---|
