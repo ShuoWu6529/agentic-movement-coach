@@ -13,7 +13,7 @@ npm run dev
 
 Open http://localhost:5173, choose **Seated knee extension** and the leg, and allow camera access. Place the camera to your side so the chosen leg is nearer to it.
 
-To test on a phone on the same network, use `npm run dev:https` and open the LAN address it prints. Phones need https for camera access, so accept the self-signed certificate warning.
+v1 supports a laptop or desktop webcam only, not phones or tablets.
 
 Therapist targets live in `public/config/targets.json`. Edit the file and reload the page to apply changes.
 

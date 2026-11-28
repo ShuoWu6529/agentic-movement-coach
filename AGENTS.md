@@ -7,7 +7,6 @@ Browser app for the AI Movement Coach pilot. `SPEC.md` is the source of truth; p
 ```bash
 npm ci                 # install exact locked versions
 npm run dev            # http://localhost:5173 (runs fetch-models first)
-npm run dev:https      # LAN + self-signed cert, for phone camera testing
 npm run build          # fetch-models, tsc --noEmit, vite build -> dist/
 npm run preview        # serve dist/
 npm test               # vitest run (jsdom)
