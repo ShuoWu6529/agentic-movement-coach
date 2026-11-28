@@ -1,7 +1,8 @@
 // Neutral calibration (R-F7, AC 4, PLANS.md §6). Averages `calibration.durationMs` of reliable,
 // still frames into a baseline. An unreliable frame, or any required joint moving more than
 // `calibration.maxMotion` (frame fraction) from where the run began, restarts it.
-// For knee extension the baseline is the resting knee angle, which is logged only.
+// For knee extension the baseline is the resting knee angle, which is logged only. Sit-to-stand runs
+// it twice, seated then standing (exercises/sitToStand.ts).
 
 import type { TargetsConfig } from './config/schema';
 import { imagePoint, type PoseFrame } from './pose';
@@ -14,18 +15,23 @@ export interface CalibrationStatus {
   moved: boolean;
 }
 
+export interface Baseline {
+  t: number;
+  baseline: Record<string, number>;
+}
+
 export class Calibration {
   private startT: number | null = null;
   private anchor: Array<{ x: number; y: number }> = [];
   private sums: Record<string, { sum: number; n: number }> = {};
-  private result: { t: number; baseline: Record<string, number> } | null = null;
+  private result: Baseline | null = null;
 
   constructor(
     private readonly cfg: TargetsConfig['calibration'],
     private readonly joints: readonly number[],
   ) {}
 
-  get baseline(): { t: number; baseline: Record<string, number> } | null {
+  get baseline(): Baseline | null {
     return this.result;
   }
 

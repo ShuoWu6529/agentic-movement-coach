@@ -75,11 +75,16 @@ export function legJoints(side: Side): LegJoints {
     : { hip: LM.rightHip, knee: LM.rightKnee, ankle: LM.rightAnkle };
 }
 
+/** Both shoulders and both hips: the joints sit-to-stand relies on, since the chair can hide the legs. */
+export const TRUNK_JOINTS: readonly number[] = [LM.leftShoulder, LM.rightShoulder, LM.leftHip, LM.rightHip];
+
 export function otherSide(side: Side): Side {
   return side === 'left' ? 'right' : 'left';
 }
 
 const JOINT_LABEL: Record<number, string> = {
+  [LM.leftShoulder]: 'left shoulder',
+  [LM.rightShoulder]: 'right shoulder',
   [LM.leftHip]: 'left hip',
   [LM.rightHip]: 'right hip',
   [LM.leftKnee]: 'left knee',
