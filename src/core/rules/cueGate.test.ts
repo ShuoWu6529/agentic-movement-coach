@@ -35,6 +35,19 @@ describe('cue gate', () => {
     expect(g.step(466, { ...open([range]), open: false, status: 'ST-TRACKING-LOST' }).shown).toBe('ST-TRACKING-LOST');
   });
 
+  it('clears advice about an earlier attempt when a new attempt starts, but keeps positive feedback', () => {
+    const g = new CueGate(config.cues);
+    const dwell = config.cues.dwellMs['KE-RANGE-LOW']!;
+    g.step(0, open([range]));
+    expect(g.step(dwell, open([range])).shown).toBe('KE-RANGE-LOW');
+    expect(g.step(dwell + 100, open()).shown).toBe('KE-RANGE-LOW'); // still within displayMs
+    expect(g.step(dwell + 133, { ...open(), attemptStarted: 1 }).shown).toBeNull();
+
+    const h = new CueGate(config.cues);
+    h.step(0, open([], [{ ruleId: 'KE-HOLD-DONE', attemptIndex: 0 }]));
+    expect(h.step(100, { ...open(), attemptStarted: 1 }).shown).toBe('KE-HOLD-DONE');
+  });
+
   it('rejects a movement rule passed as status', () => {
     const g = new CueGate(config.cues);
     expect(() => g.step(0, { ...open(), status: 'KE-RANGE-LOW' })).toThrow(/not a status rule/);

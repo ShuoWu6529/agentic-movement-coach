@@ -8,6 +8,9 @@
 //   condition commits at most once. Instant events (positive feedback) commit on the frame they occur.
 // - The same rule is not committed again within `cues.cooldownMs`; a committed cue shows for
 //   `cues.displayMs` or until replaced.
+// - When a new attempt starts, a visible advice cue about an earlier attempt is cleared, so advice is
+//   never on screen during an attempt it does not describe (for example "straighten more" while the
+//   next attempt is already at the target, AC 9).
 
 import type { TargetsConfig } from '../config/schema';
 import { getRule, type RuleId } from './registry';
@@ -32,6 +35,8 @@ export interface CueGateInput {
   conditions: readonly CueCandidate[];
   events: readonly CueCandidate[];
   status: RuleId | null;
+  /** Index of an attempt that started on this frame, if any. */
+  attemptStarted?: number | null;
 }
 
 export interface CueGateOutput {
@@ -49,7 +54,7 @@ const key = (c: CueCandidate) => `${c.ruleId}#${c.attemptIndex ?? ''}`;
 
 export class CueGate {
   private pending = new Map<string, Pending>();
-  private current: { ruleId: RuleId; until: number } | null = null;
+  private current: { ruleId: RuleId; attemptIndex: number | null; until: number } | null = null;
   private lastShown = new Map<RuleId, number>();
   private seq = 0;
 
@@ -82,6 +87,10 @@ export class CueGate {
     ready.sort((a, b) => this.rank(a.candidate.ruleId) - this.rank(b.candidate.ruleId) || a.onsetT - b.onsetT);
 
     if (this.current && t >= this.current.until) this.current = null;
+    const started = input.attemptStarted ?? null;
+    if (started !== null && this.current && this.rank(this.current.ruleId) === 0 && this.current.attemptIndex !== started) {
+      this.current = null;
+    }
     let commit: CueCommit | null = null;
     for (const r of ready) {
       if (r.pending) r.pending.done = true;
@@ -89,7 +98,7 @@ export class CueGate {
       if (last !== undefined && t - last < this.cfg.cooldownMs) continue;
       commit = { seq: this.seq++, ruleId: r.candidate.ruleId, attemptIndex: r.candidate.attemptIndex, onsetT: r.onsetT, confirmT: t };
       this.lastShown.set(r.candidate.ruleId, t);
-      this.current = { ruleId: r.candidate.ruleId, until: t + this.cfg.displayMs };
+      this.current = { ruleId: r.candidate.ruleId, attemptIndex: r.candidate.attemptIndex, until: t + this.cfg.displayMs };
       break;
     }
     return { shown: this.current?.ruleId ?? null, commit };

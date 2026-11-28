@@ -32,6 +32,8 @@ export interface AttemptRecord {
 }
 
 export interface KneeStepResult {
+  /** Index of the attempt that started on this frame, if any. */
+  startedAttempt: number | null;
   repCounted: boolean;
   /** Index of the attempt whose repetition was counted on this frame. */
   countedAttempt: number | null;
@@ -93,7 +95,7 @@ export class KneeExtensionEngine {
 
   step(t: number, flexion: number): KneeStepResult {
     this.lastT = t;
-    const result: KneeStepResult = { repCounted: false, countedAttempt: null, ended: null };
+    const result: KneeStepResult = { startedAttempt: null, repCounted: false, countedAttempt: null, ended: null };
 
     if (this.st === 'reset') {
       if (flexion >= this.cfg.startFlexionDeg) this.st = 'rest';
@@ -108,6 +110,7 @@ export class KneeExtensionEngine {
       this.rangeLow = null;
       this.holdBreak = null;
       this.st = 'extending';
+      result.startedAttempt = this.attempt.index;
     }
 
     const a = this.attempt!;
