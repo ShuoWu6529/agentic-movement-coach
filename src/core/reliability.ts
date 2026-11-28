@@ -3,8 +3,8 @@
 // lies closer than `tracking.boundsMargin` to the frame edge.
 
 import type { TargetsConfig } from './config/schema';
-import { imagePoint, legJoints } from './pose';
-import type { Side } from './types';
+import { imagePoint, legJoints, TRUNK_JOINTS } from './pose';
+import type { BuiltExerciseId, Side } from './types';
 
 export type GateReason = 'noPose' | 'outOfFrame' | 'lowVisibility';
 
@@ -17,13 +17,19 @@ export interface GateResult {
   joint: number | null;
 }
 
-/** Joints that must be tracked reliably. Only knee extension is built so far (M1). */
-export function requiredJoints(exercise: 'kneeExtension', side: Side): number[] {
+/**
+ * Joints that must be tracked reliably. Knee extension: the chosen side's hip, knee and ankle.
+ * Sit-to-stand: both shoulders and both hips only, because the chair can hide the legs (M0.5 S6).
+ */
+export function requiredJoints(exercise: BuiltExerciseId, side: Side | null): number[] {
   switch (exercise) {
     case 'kneeExtension': {
+      if (!side) throw new Error('Knee extension needs a side');
       const j = legJoints(side);
       return [j.hip, j.knee, j.ankle];
     }
+    case 'sitToStand':
+      return [...TRUNK_JOINTS];
   }
 }
 

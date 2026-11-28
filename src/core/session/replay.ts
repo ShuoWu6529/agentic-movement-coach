@@ -5,7 +5,7 @@
 import type { TargetsConfig } from '../config/schema';
 import type { PoseFrame } from '../pose';
 import type { PoseTrace } from '../trace/schema';
-import type { Side } from '../types';
+import type { BuiltExerciseId, Side } from '../types';
 import { SetSession, type SetSnapshot } from './setSession';
 
 export interface AutoAdvance {
@@ -23,9 +23,9 @@ export function stepWithAutoAdvance(session: SetSession, frame: PoseFrame, auto:
 
 export function replayTrace(
   trace: PoseTrace,
-  opts: { config: TargetsConfig; side: Side; auto?: AutoAdvance; endAtTraceEnd?: boolean },
+  opts: { config: TargetsConfig; exercise: BuiltExerciseId; side: Side | null; auto?: AutoAdvance; endAtTraceEnd?: boolean },
 ): { session: SetSession; snapshots: SetSnapshot[] } {
-  const session = new SetSession({ config: opts.config, side: opts.side, video: trace.video });
+  const session = new SetSession({ config: opts.config, exercise: opts.exercise, side: opts.side, video: trace.video });
   const auto = opts.auto ?? { start: true, resume: true };
   const snapshots: SetSnapshot[] = [];
   for (const f of trace.frames) {

@@ -3,13 +3,11 @@
 
 import type { TargetsConfig } from '../config/schema';
 import type { SetResult } from '../session/setSession';
-import type { Side } from '../types';
 import type { SessionLog } from './schema';
 
 export interface SessionMeta {
   app: { version: string; gitSha: string };
   config: { hash: string; value: TargetsConfig };
-  side: Side;
   device: SessionLog['device'];
   model: SessionLog['model'];
 }
@@ -19,8 +17,9 @@ export function buildSessionLog(result: SetResult, meta: SessionMeta, observerNo
     schemaVersion: 2,
     app: meta.app,
     config: meta.config,
-    exercise: 'kneeExtension',
-    side: meta.side,
+    exercise: result.exercise,
+    // Anatomical side for knee extension; sit-to-stand has none, so the field is left out.
+    ...(result.side ? { side: result.side } : {}),
     device: meta.device,
     model: meta.model,
     calibration: result.calibration,

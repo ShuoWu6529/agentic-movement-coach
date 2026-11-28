@@ -6,8 +6,7 @@ import type { AttemptRecord } from './exercises/exercise';
 import type { IssueCategory } from './rules/registry';
 import type { Side } from './types';
 
-/** The summary a set produces. Only knee extension runs as a set so far; sit-to-stand joins when it is wired in. */
-export type SetSummary = KneeSummary;
+export type SetSummary = KneeSummary | SitToStandSummary;
 
 export interface KneeSummary {
   exercise: 'kneeExtension';

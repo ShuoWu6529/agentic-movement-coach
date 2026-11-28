@@ -1,7 +1,8 @@
 // Framing check (R-F6, AC 3, AC 19, PLANS.md §3). It passes only after `framing.stableMs` of
-// continuously reliable frames at an effective frame rate of at least `tracking.minFps`, with the
-// chosen side's leg joints more visible than the other side's (the model can swap near and far legs;
-// mandatory while M0.5 is deferred). Brightness only chooses the message; it never passes the check.
+// continuously reliable frames at an effective frame rate of at least `tracking.minFps`. For a
+// side-view exercise (knee extension) the chosen side's leg joints must also be more visible than the
+// other side's, because the model can swap near and far legs; sit-to-stand (45° front-side) has no
+// side check. Brightness only chooses the message; it never passes the check.
 
 import type { TargetsConfig } from './config/schema';
 import { imagePoint, jointLabel, legJoints, otherSide, type PoseFrame } from './pose';
@@ -37,9 +38,10 @@ export class FramingCheck {
   private stableSince: number | null = null;
   private times: number[] = [];
 
+  /** `side` is the chosen side for a side-view exercise, or null for no side check. */
   constructor(
     private readonly config: TargetsConfig,
-    private readonly side: Side,
+    private readonly side: Side | null,
   ) {}
 
   reset(): void {
@@ -76,18 +78,21 @@ export class FramingCheck {
   }
 
   private findIssue(frame: PoseFrame, gate: GateResult): FramingIssue | null {
-    if (!gate.ok) {
-      if (frame.luma !== undefined && frame.luma < this.config.framing.minLuma) return { kind: 'dim' };
-      if (gate.reason === 'noPose' || gate.joint === null) return { kind: 'noPose' };
-      return { kind: 'joint', joint: gate.joint, problem: gate.reason === 'outOfFrame' ? 'outOfFrame' : 'lowVisibility' };
-    }
-    if (frame.lm && !chosenSideMoreVisible(frame.lm, this.side)) return { kind: 'side' };
+    if (!gate.ok) return gateIssue(frame, gate, this.config);
+    if (this.side && frame.lm && !chosenSideMoreVisible(frame.lm, this.side)) return { kind: 'side' };
     return null;
   }
 }
 
+/** What is wrong with a frame the gate refused, for the framing message (also used in calibration). */
+export function gateIssue(frame: PoseFrame, gate: GateResult, config: TargetsConfig): FramingIssue {
+  if (frame.luma !== undefined && frame.luma < config.framing.minLuma) return { kind: 'dim' };
+  if (gate.reason === 'noPose' || gate.joint === null) return { kind: 'noPose' };
+  return { kind: 'joint', joint: gate.joint, problem: gate.reason === 'outOfFrame' ? 'outOfFrame' : 'lowVisibility' };
+}
+
 /** What to fix, in plain words (AC 3). */
-export function framingMessage(issue: FramingIssue, side: Side): string {
+export function framingMessage(issue: FramingIssue, side: Side | null): string {
   switch (issue.kind) {
     case 'noPose':
       return "We can't see you yet. Sit so your whole body is in the picture.";
@@ -98,7 +103,9 @@ export function framingMessage(issue: FramingIssue, side: Side): string {
         ? `Your ${jointLabel(issue.joint)} is at the edge of the picture. Move the camera back a little.`
         : `We can't see your ${jointLabel(issue.joint)} clearly. Make sure nothing blocks it and the room is bright enough.`;
     case 'side':
-      return `Turn so your ${side} side faces the camera, with your ${side} leg nearer to it.`;
+      return side
+        ? `Turn so your ${side} side faces the camera, with your ${side} leg nearer to it.`
+        : 'Turn so the camera sees you from the front and a little to one side.';
     case 'slow':
       return 'Tracking is running slowly on this device. Close other apps or tabs, then try again.';
     case 'settling':

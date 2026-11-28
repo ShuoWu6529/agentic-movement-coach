@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { kneeTrace } from '../../fixtures/synthetic/kneeTrace';
+import { sitToStandTrace } from '../../fixtures/synthetic/sitToStandTrace';
 import type { TargetsConfig } from './config/schema';
 import { FramingCheck, framingMessage, type FramingStatus } from './framing';
 import { LM } from './pose';
@@ -89,5 +90,20 @@ describe('framing check', () => {
     const s = check(still(3000, { fps: 8 }));
     expect(s.some((x) => x.passed)).toBe(false);
     expect(s.at(-1)!.issue).toEqual({ kind: 'slow', fps: expect.closeTo(8, 0) });
+  });
+
+  it('uses trunk joints only for sit-to-stand, with no side check (M2)', () => {
+    const trunk = requiredJoints('sitToStand', null);
+    expect(trunk.sort((a, b) => a - b)).toEqual([LM.leftShoulder, LM.rightShoulder, LM.leftHip, LM.rightHip]);
+    // The synthetic chair hides the legs (visibility 0.2–0.45), as in M0.5 S6; framing still passes.
+    const tr = sitToStandTrace({ segments: [{ ms: 2000, p: 0 }] });
+    const f = new FramingCheck(config, null);
+    const out = tr.frames.map((fr) => f.step(fr, gateFrame(fr.lm, trunk, config.tracking)));
+    expect(out.at(-1)!.passed).toBe(true);
+    const lowShoulder = withLandmark(tr, LM.rightShoulder, { vis: 0.2 });
+    const g = new FramingCheck(config, null);
+    const bad = lowShoulder.frames.map((fr) => g.step(fr, gateFrame(fr.lm, trunk, config.tracking)));
+    expect(bad.at(-1)!.issue).toEqual({ kind: 'joint', joint: LM.rightShoulder, problem: 'lowVisibility' });
+    expect(framingMessage(bad.at(-1)!.issue!, null)).toMatch(/right shoulder/);
   });
 });

@@ -4,7 +4,6 @@
 import { useEffect, useRef, useState, type Dispatch } from 'react';
 import type { SessionMeta } from '../../core/log/build';
 import { getRule } from '../../core/rules/registry';
-import { requiredJoints } from '../../core/reliability';
 import { CameraStartError } from '../../pose/cameraErrors';
 import type { FrameSource } from '../../pose/types';
 import type { AppDeps } from '../deps';
@@ -36,7 +35,7 @@ export function SessionScreen({ state, deps, dispatch }: { state: SessionState; 
         const replay = source.info.kind === 'trace';
         runner = new SetRunner(
           config,
-          selection.side,
+          selection,
           source,
           {
             onPhase: (phase) => dispatch({ type: 'setPhase', phase }),
@@ -44,7 +43,6 @@ export function SessionScreen({ state, deps, dispatch }: { state: SessionState; 
               const meta: SessionMeta = {
                 app: { version: __APP_VERSION__, gitSha: __GIT_SHA__ },
                 config: { hash: configHash, value: config },
-                side: selection.side,
                 device: { userAgent: navigator.userAgent, camera: source.info.camera, clock: source.info.clock() },
                 model: source.info.model,
               };
@@ -113,7 +111,6 @@ function LiveSet({
     return () => v.remove();
   }, [source]);
 
-  const side = state.selection.side;
   return (
     <section className={styles.session} aria-label="Exercise set">
       <div
@@ -125,7 +122,7 @@ function LiveSet({
           ref={(c) => runner.attachCanvas(c)}
           className={styles.overlay}
           aria-label="Skeleton overlay"
-          data-required-joints={requiredJoints('kneeExtension', side).join(',')}
+          data-required-joints={runner.joints.join(',')}
         />
         {state.phase === 'countdown' && view?.countdownRemainingS != null && (
           <div className={styles.countdown} aria-live="assertive" aria-label="Countdown">
@@ -151,8 +148,10 @@ function Hud({
   dispatch: Dispatch<PhaseAction>;
   replayEnded: boolean;
 }) {
+  const { exercise, side } = state.selection;
   const ke = state.config.exercises.kneeExtension;
-  const side = state.selection.side;
+  const sts = state.config.exercises.sitToStand;
+  const targetReps = exercise === 'sitToStand' ? sts.reps : ke.reps;
   const resuming = view?.resuming ?? false;
   const back = (
     <button type="button" className={styles.secondary} onClick={() => dispatch({ type: 'back' })}>
@@ -167,9 +166,11 @@ function Hud({
   const counter = (
     <p className={styles.counter}>
       <output aria-label="Repetitions">{view?.reps ?? 0}</output>
-      <span className={styles.counterOf}> / {ke.reps}</span>
+      <span className={styles.counterOf}> / {targetReps}</span>
     </p>
   );
+  const seconds = (s: number | null | undefined) => (s != null ? `${s.toFixed(1)} s` : '–');
+  const range = ([lo, hi]: readonly [number, number]) => `${lo / 1000}–${hi / 1000} s`;
 
   switch (state.phase) {
     case 'framing':
@@ -192,21 +193,32 @@ function Hud({
           )}
         </div>
       );
-    case 'calibration':
+    case 'calibration': {
+      const standing = view?.calibrationStage === 'standing';
+      const prompt =
+        exercise === 'sitToStand'
+          ? standing
+            ? 'Stand up and hold still while we note your standing position.'
+            : 'Sit upright with your feet on the floor while we note your seated position.'
+          : `Rest your ${side} foot on the floor with the knee bent while we note your starting position.`;
       return (
         <div className={styles.hud}>
-          <h1 className={styles.heading}>Sit still for a moment</h1>
+          <h1 className={styles.heading}>{standing ? 'Now stand still for a moment' : 'Sit still for a moment'}</h1>
           <p role="status" className={styles.message}>
-            Rest your {side} foot on the floor with the knee bent while we note your starting position.
+            {view?.calibrationText ?? prompt}
           </p>
           <progress max={1} value={view?.calibrationProgress ?? 0} aria-label="Calibration progress" />
           <div className={styles.actions}>{back}</div>
         </div>
       );
+    }
     case 'countdown':
       return (
         <div className={styles.hud}>
           <h1 className={styles.heading}>Get ready</h1>
+          {exercise === 'sitToStand' && (
+            <p role="status" className={styles.message}>Sit down when you are ready. Counting starts once you are seated.</p>
+          )}
           {counter}
           <div className={styles.actions}>{resuming ? endSet : back}</div>
         </div>
@@ -216,20 +228,37 @@ function Hud({
       return (
         <div className={styles.hud}>
           {counter}
-          <dl className={styles.readouts}>
-            <div>
-              <dt>Knee bend</dt>
-              <dd aria-label="Knee angle">{view?.angle != null ? `${view.angle}°` : '–'}</dd>
-            </div>
-            <div>
-              <dt>Target</dt>
-              <dd>{ke.targetFlexionAtMostDeg}° or less</dd>
-            </div>
-            <div>
-              <dt>Hold</dt>
-              <dd aria-label="Hold timer">{view?.holdRemainingS != null ? `${view.holdRemainingS.toFixed(1)} s` : `${ke.holdSeconds} s`}</dd>
-            </div>
-          </dl>
+          {exercise === 'sitToStand' ? (
+            <dl className={styles.readouts}>
+              <div>
+                <dt>Last stand-up</dt>
+                <dd aria-label="Last rise time">{seconds(view?.lastRiseS)}</dd>
+              </div>
+              <div>
+                <dt>Last sit-down</dt>
+                <dd aria-label="Last lower time">{seconds(view?.lastLowerS)}</dd>
+              </div>
+              <div>
+                <dt>Target pace</dt>
+                <dd>Up {range(sts.riseMs)}, down {range(sts.lowerMs)}</dd>
+              </div>
+            </dl>
+          ) : (
+            <dl className={styles.readouts}>
+              <div>
+                <dt>Knee bend</dt>
+                <dd aria-label="Knee angle">{view?.angle != null ? `${view.angle}°` : '–'}</dd>
+              </div>
+              <div>
+                <dt>Target</dt>
+                <dd>{ke.targetFlexionAtMostDeg}° or less</dd>
+              </div>
+              <div>
+                <dt>Hold</dt>
+                <dd aria-label="Hold timer">{view?.holdRemainingS != null ? `${view.holdRemainingS.toFixed(1)} s` : `${ke.holdSeconds} s`}</dd>
+              </div>
+            </dl>
+          )}
           <p role="status" aria-label="Feedback" className={`${styles.cue} ${rule?.kind === 'positive' ? styles.positive : ''}`}>
             {rule && rule.kind !== 'status' ? rule.text : ' '}
           </p>

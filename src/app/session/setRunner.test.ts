@@ -22,7 +22,7 @@ describe('SetRunner with a stalled camera', () => {
     const t0 = performance.now();
     src.now = () => performance.now() - t0;
     let finished: { result: SetResult; trace: PoseTrace | null } | null = null;
-    const runner = new SetRunner(config, 'left', src, {
+    const runner = new SetRunner(config, { exercise: 'kneeExtension', side: 'left' }, src, {
       onPhase: () => {},
       onFinish: (result, trace) => (finished = { result, trace }),
     }, { start: true, resume: false });
@@ -59,12 +59,12 @@ describe('SetRunner with a stalled camera', () => {
     expect(stalled.every((f) => f.lm === null && f.world === null)).toBe(true);
 
     const auto = { start: true, resume: false };
-    const replayed = replayTrace(trace, { config, side: 'left', auto }).session.result()!;
+    const replayed = replayTrace(trace, { config, exercise: 'kneeExtension', side: 'left', auto }).session.result()!;
     expect(replayed.summary.reps).toBe(live.result.summary.reps);
     expect(replayed.summary.trackingLosses).toBe(1);
 
     // Without the watchdog frames, the gap would read as one continuous hold and count a rep.
     const withoutStall = { ...trace, frames: trace.frames.filter((f) => !(f.t > stallStart && f.t < stallStart + 4000)) };
-    expect(replayTrace(withoutStall, { config, side: 'left', auto }).session.result()!.summary.reps).toBe(1);
+    expect(replayTrace(withoutStall, { config, exercise: 'kneeExtension', side: 'left', auto }).session.result()!.summary.reps).toBe(1);
   });
 });

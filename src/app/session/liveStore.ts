@@ -2,6 +2,7 @@
 // changes (phase, rep, cue, messages, buttons) and a throttled angle/timer readout reach React.
 
 import { useSyncExternalStore } from 'react';
+import type { CalibrationStage } from '../../core/exercises/exercise';
 import type { SetPhase } from '../../core/session/phases';
 import type { RuleId } from '../../core/rules/registry';
 
@@ -12,6 +13,9 @@ export interface LiveView {
   framingText: string | null;
   canStart: boolean;
   calibrationProgress: number;
+  calibrationStage: CalibrationStage | null;
+  /** What to fix when tracking fails during calibration. */
+  calibrationText: string | null;
   countdownRemainingS: number | null;
   /** Whole degrees of knee flexion; null while tracking is unreliable. */
   angle: number | null;
@@ -19,6 +23,9 @@ export interface LiveView {
   targetReps: number;
   /** Tenths of a second left on the hold timer; null when no hold runs. */
   holdRemainingS: number | null;
+  /** Rise and lower time of the last sit-to-stand repetition, tenths of a second; null when unreliable. */
+  lastRiseS: number | null;
+  lastLowerS: number | null;
   shown: RuleId | null;
   readyToResume: boolean;
 }
@@ -30,7 +37,8 @@ function sameDiscrete(a: LiveView, b: LiveView): boolean {
     a.phase === b.phase && a.resuming === b.resuming && a.trackingOk === b.trackingOk && a.framingText === b.framingText &&
     a.canStart === b.canStart && a.countdownRemainingS === b.countdownRemainingS && a.reps === b.reps &&
     a.shown === b.shown && a.readyToResume === b.readyToResume && (a.holdRemainingS === null) === (b.holdRemainingS === null) &&
-    (a.angle === null) === (b.angle === null)
+    (a.angle === null) === (b.angle === null) && a.calibrationStage === b.calibrationStage &&
+    a.calibrationText === b.calibrationText && a.lastRiseS === b.lastRiseS && a.lastLowerS === b.lastLowerS
   );
 }
 

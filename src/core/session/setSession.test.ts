@@ -9,6 +9,7 @@ import { buildSessionLog } from '../log/build';
 import { logInvariantProblems } from '../log/invariants';
 import { SessionLogSchema } from '../log/schema';
 import { getRule } from '../rules/registry';
+import type { KneeSummary } from '../summary';
 import type { PoseTrace } from '../trace/schema';
 import { replayTrace } from './replay';
 import { SetSession, type SetSnapshot } from './setSession';
@@ -24,20 +25,19 @@ function withKnee(patch: Partial<TargetsConfig['exercises']['kneeExtension']>, b
 const trace = (segments: Segment[], side: 'left' | 'right' = 'left', seed = 1) => kneeTrace({ side, segments, seed });
 
 function run(t: PoseTrace, cfg = config, side: 'left' | 'right' = 'left') {
-  const { session, snapshots } = replayTrace(t, { config: cfg, side });
+  const { session, snapshots } = replayTrace(t, { config: cfg, exercise: 'kneeExtension', side });
   const result = session.result()!;
   const log = buildSessionLog(
     result,
     {
       app: { version: 'test', gitSha: 'test' },
       config: { hash: '0'.repeat(64), value: cfg },
-      side,
       device: { userAgent: 'vitest', camera: { w: 640, h: 480, fps: 30 }, clock: 'trace' },
       model: { variant: 'full', delegate: 'CPU' },
     },
     '',
   );
-  return { session, snapshots, result, log };
+  return { session, snapshots, result, log, summary: result.summary as KneeSummary };
 }
 
 const cueEvents = (log: ReturnType<typeof run>['log']) =>
@@ -45,7 +45,7 @@ const cueEvents = (log: ReturnType<typeof run>['log']) =>
 
 describe('set session on synthetic traces', () => {
   it('walks framing → calibration → countdown → active → summary and counts each held rep once', () => {
-    const { log, result, snapshots } = run(trace([...SETTLE, ...extension(5, 3500), ...extension(8, 3500), ...extension(10, 3500)]));
+    const { log, result, snapshots, summary } = run(trace([...SETTLE, ...extension(5, 3500), ...extension(8, 3500), ...extension(10, 3500)]));
     expect(log.events.filter((e) => e.type === 'phase').map((e) => (e as { phase: string }).phase)).toEqual([
       'framing', 'calibration', 'countdown', 'active', 'summary',
     ]);
@@ -54,7 +54,7 @@ describe('set session on synthetic traces', () => {
     const steps = snapshots.map((s) => s.reps).filter((r, i, a) => i === 0 || r !== a[i - 1]);
     expect(steps).toEqual([0, 1, 2, 3]);
     expect(result.calibration.baseline.kneeFlexion).toBeCloseTo(90, 0);
-    expect(result.summary.bestFlexion).toBeLessThan(8);
+    expect(summary.bestFlexion).toBeLessThan(8);
     expect(result.summary.wentWell.length).toBeGreaterThan(0);
   });
 
@@ -112,7 +112,7 @@ describe('set session on synthetic traces', () => {
     expect(a.result.summary.reps).toBe(3);
     expect(b.result.summary.reps).toBe(0); // 2.5 s holds fall short of 3 s
     expect(c.result.summary.reps).toBe(2); // the set ends at the configured total
-    expect(a.result.summary.holdsMs.every((h) => h === 2000)).toBe(true);
+    expect(a.summary.holdsMs.every((h) => h === 2000)).toBe(true);
 
     const tight = withKnee({ targetFlexionAtMostDeg: 5, toleranceDeg: 2 });
     expect(cueEvents(run(t, tight).log).map((e) => e.ruleId)).toContain('KE-RANGE-LOW');
@@ -178,7 +178,7 @@ describe('set session on synthetic traces', () => {
 
   it('cannot start before framing passes, and never starts the set before calibration completes (AC 4)', () => {
     const t = trace([{ ms: 300, flexion: 90 }, { ms: 6000, flexion: 90 }]);
-    const s = new SetSession({ config, side: 'left', video: t.video });
+    const s = new SetSession({ config, exercise: 'kneeExtension', side: 'left', video: t.video });
     s.step(t.frames[0]!);
     expect(s.startSet()).toBe(false);
     let started = false;
@@ -208,10 +208,10 @@ describe('set session on synthetic traces', () => {
 
   it('produces a summary with a note for a set with no repetitions (AC 6)', () => {
     const t = trace([...SETTLE, { ms: 3000, flexion: 90 }]);
-    const { result } = run(t);
+    const { result, summary } = run(t);
     expect(result.summary.reps).toBe(0);
     expect(result.summary.wentWell.length + result.summary.adjust.length).toBeGreaterThan(0);
-    expect(Math.abs(result.summary.bestFlexion! - 90)).toBeLessThan(3);
+    expect(Math.abs(summary.bestFlexion! - 90)).toBeLessThan(3);
   });
 
   it('writes a log that validates against the schema and keeps its invariants (AC 18, AC 20)', () => {
@@ -239,7 +239,7 @@ describe('set session on synthetic traces', () => {
 
   it('lets the display adapter record when a cue reached the screen', () => {
     const t = trace([...SETTLE, ...extension(25, 1500)]);
-    const s = new SetSession({ config, side: 'left', video: t.video });
+    const s = new SetSession({ config, exercise: 'kneeExtension', side: 'left', video: t.video });
     for (const f of t.frames) {
       const snap = s.step(f);
       if (snap?.canStart) s.startSet();
