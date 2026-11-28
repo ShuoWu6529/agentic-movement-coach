@@ -4,44 +4,43 @@ This is the approved technical plan for v1: architecture, milestone order, the c
 
 The plan was reviewed against SPEC sections 3–7 before scaffolding, and the changes from that review are included. Values described as config are tuned during the build (O-7), not fixed here. Sections 1–12 were SPEC §8.1–8.12 in SPEC v0.3, and keep the same numbers.
 
-## Status (2026-11-24)
+## Status (2026-11-27)
 
 | Milestone | State | Evidence |
 |---|---|---|
 | M0 Scaffold and definitions | **Done** | PR #3 (scaffold) and PR #4 (review fixes) merged. CI is green on `main`. 29 Vitest tests. Headless Chromium shows the exercise list and disclaimer from `npm run dev` after a clean `npm ci` and from a production build served at a subpath. |
 | M0.5 Tracking-reliability spike | **Done** (2026-11-27) | Passes on the laptop webcam with `full`, the only supported device (phones and `lite` dropped: SPEC C-1, R-F1). At the app's current gate setting (visibility 0.5, margin 0.02), over all eight scenarios: 100% of bad frames caught (457 / 457), 0.32% of good frames flagged (6 / 1,862), worst detection delay 0 ms. Thresholds 0.3–0.8 all pass, so no config change. Results, scoring rule changes, re-takes and limitations are in `docs/spike-notes.md`. One follow-up: dim light (S5) left the gate passing with 3.8× the jitter, so the framing check needs a brightness or jitter term (added to M5). Tool in `spike/` and takes in `data/spike-takes/`, neither committed. |
-| M1 Seated knee extension | **Built; manual device checks pending** (2026-11-24) | Core (`src/core`: gate, framing with side check, calibration, knee engine, cue gate, `SetSession`, summary, log build and invariants), browser edges (`src/pose`: async `PoseEngine`, `CameraSource`, `TraceSource`, watchdog), app shell (phase reducer, `SetRunner`, screens, summary and export). 108 Vitest tests, including the randomized no-cue-on-unreliable-frame test, run on synthetic traces (`fixtures/synthetic/`). 3 Playwright tests (fake-camera smoke, permission denied, log download) pass on the production build and are in CI. Not done: the owner's manual checks in **Owner to-do: close M1** below. M1 is not Done until they pass. |
+| M1 Seated knee extension | **Done** (2026-11-27) | Core (`src/core`: gate, framing with side check, calibration, knee engine, cue gate, `SetSession`, summary, log build and invariants), browser edges (`src/pose`: async `PoseEngine`, `CameraSource`, `TraceSource`, watchdog), app shell (phase reducer, `SetRunner`, screens, summary and export). 111 Vitest tests, including the randomized no-cue-on-unreliable-frame test, run on synthetic traces (`fixtures/synthetic/`). Audited against the 2026-11-27 SPEC (webcam only, `full` only): `fetch-models` fetches only `full` and removes any other model file, so builds no longer ship `lite`; `PoseEngine` and the frame sources are `full`-only; trace replay refuses `lite` traces, so the app never writes `'lite'` to a log; the camera-denied help gives desktop Chrome and Safari steps instead of iPhone steps. 3 Playwright tests (fake-camera smoke, permission denied, log download) pass on the production build and are in CI. The owner's manual checks passed on 2026-11-27 on a laptop webcam in desktop Chrome (`device.clock`: `captureTime`); see **M1 manual checks** below. |
 | M2–M8 | Not started | |
 
-### Owner to-do: close M1
+### M1 manual checks (passed 2026-11-27)
 
-These need a person and real devices, so they could not be done in the build. Run them with the camera, not a trace replay. Tick each box and note the device and browser. When all of them pass, change M1 to **Done** in the table above.
+Run by the owner with the live camera, not a trace replay: a laptop webcam in desktop Chrome, using `npm run dev` (and `npm run preview` for the config check). Safari was not tested.
 
-Setup: `npm ci`, then `npm run dev` on the laptop. For a live check, download the session log from **Research export** on the summary.
+- [x] **Laptop set (M1 exit).** Complete one full knee-extension set on a laptop webcam. You reach the summary, and the downloaded session log is valid JSON.
+- [x] **Permission prompts (AC 2).** Allow, and separately deny, camera access. The app says access was denied and how to allow it, with no Start button. Passed in desktop Chrome; desktop Safari not tested.
+- [x] **Overlay (AC 5).** The skeleton lines up with your body. The preview is mirrored like a mirror, and choosing the left leg tracks your actual left leg.
+- [x] **Cover the camera mid-set (AC 16, 17).** Within about 1 second the cue clears and "Can't see you well" appears. Uncover it, press Resume, and check that completed reps were kept and no rep was counted while covered.
+- [x] **Config reload (AC 14, 15).** Edit `public/config/targets.json` (for example `holdSeconds` or `reps`) and reload, under both `npm run dev` and `npm run preview` (after `npm run build`). The new value takes effect. Then break the file on purpose: the app shows the config error and offers no way to start.
+- [x] **Clock per device.** `device.clock` from the session log:
+  - Laptop webcam, desktop Chrome: `captureTime`. Feedback delay from this setup is measured from the camera's capture time.
 
-- [ ] **Laptop set (M1 exit).** Complete one full knee-extension set on a laptop webcam. You reach the summary, and the downloaded session log is valid JSON.
-- [ ] **Permission prompts (AC 2).** In desktop Chrome and, if you have a Mac, desktop Safari: allow access, and separately deny it. The app should say access was denied and how to allow it, with no Start button.
-- [ ] **Overlay (AC 5).** The skeleton lines up with your body. The preview is mirrored like a mirror, and choosing the left leg tracks your actual left leg.
-- [ ] **Cover the camera mid-set (AC 16, 17).** Within about 1 second the cue clears and "Can't see you well" appears. Uncover it, press Resume, and check that completed reps were kept and no rep was counted while covered.
-- [ ] **Config reload (AC 14, 15).** Edit `public/config/targets.json` (for example `holdSeconds` or `reps`) and reload, under both `npm run dev` and `npm run preview` (after `npm run build`). The new value takes effect. Then break the file on purpose: the app shows the config error and offers no way to start.
-- [ ] **Clock per device.** In each log, note `device.clock` (`captureTime` or `callback`) and record it here next to the device.
+Owner decisions recorded with M1:
 
-Not blocking M1, but needing your call:
+- [x] The **Decisions made in M1** listed below are confirmed (2026-11-27).
+- [x] SPEC O-5 records that team members may record themselves (2026-11-27).
 
-- [ ] Confirm or change the **Decisions made in M1** listed below.
-- [ ] Update SPEC O-5 to record that team members may record themselves (see the O-5 bullet below).
-
-**Next: the owner to-do above (close M1), then M2.** M0.5 passed on 2026-11-27 (`docs/spike-notes.md`), which also satisfies the M5 gate measurement and the M0.5 requirement before M7. Settled on 2026-11-24, updated 2026-11-27:
+**Next: M2 (sit-to-stand).** M0.5 passed on 2026-11-27 (`docs/spike-notes.md`), which also satisfies the M5 gate measurement and the M0.5 requirement before M7. Settled on 2026-11-24, updated 2026-11-27:
 
 - M0.5 was deferred on 2026-11-24, resumed by the owner on 2026-11-27 with the spike tool rather than the app's trace export, and passed the same day.
 - `lite` was dropped on 2026-11-27 (SPEC R-F1, O-6). The app runs `full` only, and a device too slow for it fails framing.
 - Phones and tablets were dropped on 2026-11-27 (SPEC C-1). v1 runs on a laptop or desktop webcam, and `npm run dev:https` was removed.
-- O-5: the owner confirmed that team members may record themselves, both for the spike and for the traces exported during M1–M5 manual checks. Volunteer recording is still gated. SPEC.md still lists this question under O-5 and needs the owner's update.
+- O-5: the owner confirmed that team members may record themselves, both for the spike and for the traces exported during M1–M5 manual checks. Volunteer recording is still gated. Recorded in SPEC O-5 on 2026-11-27.
 - `spike/` stays local and is not committed. Its takes go in `data/spike-takes/`, outside the folder the spike's dev server serves, and stay out of git (`data/` is ignored and checked by `check:data`).
 
 **Versions recorded at scaffold:** Node 24.16 and npm 11.13 (CI uses Node 24), React 19.3, Vite 8.3, Vitest 5.1, zod 4.6, `@mediapipe/tasks-vision` 1.2.3. TypeScript is pinned to 6.0.x because typescript-eslint supports versions below 6.1 only. Added in M1: `@playwright/test` 1.65.1 (Chromium build 1255). The permission-denied test uses full Chromium in headless mode (`channel: 'chromium'`), because the headless shell answers every camera prompt with `NotSupportedError`.
 
-**Decisions made in M1** (owner to confirm; each is recorded where it applies):
+**Decisions made in M1** (confirmed by the owner on 2026-11-27; each is recorded where it applies):
 
 - **Session log v2** (§5): `attempt` events carry `tStart`, so scoring can align attempts by time overlap, and `device.clock` gains `'trace'` for sessions replayed from a pose trace. No v1 log was ever recorded.
 - **Knee attempt end** (`docs/definitions.md`): the `reversalDeg` end applies only outside the target band. Otherwise a patient who over-reaches and settles back into the band would end the attempt mid-hold.
