@@ -26,7 +26,7 @@ This is a small feasibility pilot. It is **not** a clinically validated product,
 1. **Choose exercise:** the patient picks seated knee extension, sit-to-stand, or shoulder raise.
 2. **Start camera:** the browser asks for camera permission; the pose model loads on-device.
 3. **Framing check:** the app confirms the body parts required for that exercise are visible and lighting is adequate, and tells the patient how to fix it if not. The set cannot start until the check passes.
-4. **Neutral calibration:** the patient holds a resting pose briefly so the app records their baseline posture.
+4. **Neutral calibration:** the patient holds a resting pose briefly (for sit-to-stand, seated and then standing) so the app records their baseline posture.
 5. **Countdown, then set:** the patient performs the prescribed set. The app shows a skeleton overlay, a live rep counter, a hold timer where relevant, and short text cues.
 6. **Tracking loss:** if tracking becomes unreliable mid-set, the app pauses, shows a "can't see you well" state, gives no movement advice, and resumes only after tracking recovers.
 7. **Summary:** at the end of the set the app shows reps completed, hold durations, best angle (or elevation), and a short list of what went well and what to adjust.

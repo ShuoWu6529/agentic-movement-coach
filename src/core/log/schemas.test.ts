@@ -36,6 +36,18 @@ describe('session log schema v2', () => {
     expect(SessionLogSchema.safeParse(await minimalLog()).success).toBe(true);
   });
 
+  it('still accepts a log recorded in M1, whose embedded config is v1 (no minStandRise)', async () => {
+    const log = await minimalLog();
+    const v1 = structuredClone(config);
+    v1.schemaVersion = 1;
+    delete v1.exercises.sitToStand.minStandRise;
+    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: v1 } }).success).toBe(true);
+    // Each version is checked against its own shape: v1 with the v2 field, or v2 without it, is rejected.
+    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...v1, exercises: config.exercises } } }).success).toBe(false);
+    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...config, exercises: v1.exercises } } }).success).toBe(false);
+    expect(SessionLogSchema.safeParse({ ...log, config: { ...log.config, value: { ...config, schemaVersion: 3 } } }).success).toBe(false);
+  });
+
   it('rejects an unknown schemaVersion and a missing observer note', async () => {
     const log = await minimalLog();
     expect(SessionLogSchema.safeParse({ ...log, schemaVersion: 1 }).success).toBe(false);

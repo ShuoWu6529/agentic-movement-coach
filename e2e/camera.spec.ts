@@ -1,8 +1,10 @@
-// M1 browser checks (PLANS.md §8): AC 1 and 5 with a fake camera, and AC 20 (log download validates).
+// Browser checks (PLANS.md §8): AC 1 and 5 with a fake camera, and AC 20 (log download validates) for
+// knee extension (M1) and sit-to-stand (M2).
 
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { extension, kneeTrace, SETTLE } from '../fixtures/synthetic/kneeTrace';
+import { cycle, sitToStandTrace, STS_SETTLE } from '../fixtures/synthetic/sitToStandTrace';
 import { logInvariantProblems } from '../src/core/log/invariants';
 import { SessionLogSchema } from '../src/core/log/schema';
 
@@ -79,4 +81,34 @@ test('replays a pose trace and downloads a session log that validates (AC 20)', 
   expect(logInvariantProblems(parsed.data!)).toEqual([]);
   expect(log.observerNote).toBe('playwright');
   expect(log.app.gitSha).not.toBe('');
+});
+
+test('replays a sit-to-stand trace and downloads a session log that validates (AC 11, 20)', async ({ page }, info) => {
+  const trace = sitToStandTrace({ segments: [...STS_SETTLE, ...cycle(), ...cycle({ up: 1000 }), { ms: 600, noPose: true }, { ms: 1500, p: 0 }] });
+  await page.goto('./');
+  await page.getByText('Research: replay a recorded pose trace').click();
+  await page.getByLabel('Pose trace file (.json)').setInputFiles({
+    name: 'synthetic-sts.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(trace)),
+  });
+  await page.getByLabel('Exercise', { exact: true }).selectOption('sitToStand');
+  await page.getByRole('button', { name: 'Replay trace' }).click();
+  await expect(page.getByRole('heading', { name: 'Set summary' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByLabel('Repetitions completed')).toContainText('2 /');
+  await expect(page.getByLabel('Average rise time')).toContainText('target 1–3 s');
+
+  await page.getByText('Research export').click();
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download session log' }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^session-sit-to-stand-.*\.json$/);
+  const path = info.outputPath('log.json');
+  await download.saveAs(path);
+  const log = JSON.parse(await readFile(path, 'utf8'));
+  const parsed = SessionLogSchema.safeParse(log);
+  expect(parsed.success, JSON.stringify(parsed.error?.issues.slice(0, 3))).toBe(true);
+  expect(logInvariantProblems(parsed.data!)).toEqual([]);
+  expect(log.exercise).toBe('sitToStand');
+  expect(log.events.map((e: { ruleId?: string }) => e.ruleId).filter(Boolean)).toEqual(['STS-TEMPO-GOOD', 'STS-RISE-FAST']);
 });

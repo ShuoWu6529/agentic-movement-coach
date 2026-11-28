@@ -1,6 +1,8 @@
 // Targets config schema (R-F3, PLANS.md §5). zod is the single source of truth: the JSON loader,
 // and later the settings form (M4), read min, max and unit from here. Every threshold is config (R-E9).
 // Ranges are sanity bounds to catch typos, not clinical limits.
+// v2 (M2): `exercises.sitToStand.minStandRise`, for the standing pose of sit-to-stand calibration.
+// The v1 shape is kept only to read session logs recorded before M2 (log/schema.ts); the app loads v2.
 
 import { z } from 'zod';
 import { isRuleId, RULES } from '../rules/registry';
@@ -16,8 +18,22 @@ const range = (min: number, max: number, unit: string) =>
     .refine(([lo, hi]) => lo <= hi, { message: 'Lower bound must not exceed upper bound' })
     .meta({ unit });
 
+const SitToStandV1 = z.strictObject({
+  reps: num(1, 50, 'reps', { int: true }),
+  riseMs: range(100, 20000, 'ms'),
+  lowerMs: range(100, 20000, 'ms'),
+  standFrac: num(0, 1, 'fraction'),
+  sitFrac: num(0, 1, 'fraction'),
+});
+
+const sitToStandChecks = <T extends typeof SitToStandV1>(schema: T) =>
+  schema.refine((s) => s.sitFrac < s.standFrac, {
+    path: ['sitFrac'],
+    message: 'Must be less than standFrac, or seated and standing overlap',
+  });
+
 export const TargetsConfigSchema = z.strictObject({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   configVersion: z.string().min(1),
   tracking: z.strictObject({
     minVisibility: num(0, 1, 'score'),
@@ -66,18 +82,13 @@ export const TargetsConfigSchema = z.strictObject({
         path: ['startFlexionDeg'],
         message: 'Must be greater than targetFlexionAtMostDeg + toleranceDeg, or an attempt starts inside the target band',
       }),
-    sitToStand: z
-      .strictObject({
-        reps: num(1, 50, 'reps', { int: true }),
-        riseMs: range(100, 20000, 'ms'),
-        lowerMs: range(100, 20000, 'ms'),
-        standFrac: num(0, 1, 'fraction'),
-        sitFrac: num(0, 1, 'fraction'),
-      })
-      .refine((s) => s.sitFrac < s.standFrac, {
-        path: ['sitFrac'],
-        message: 'Must be less than standFrac, or seated and standing overlap',
+    sitToStand: sitToStandChecks(
+      SitToStandV1.extend({
+        // Calibration accepts a still standing pose only if the shoulders rose at least this far above
+        // the seated height, as a fraction of the seated trunk length (docs/definitions.md).
+        minStandRise: num(0.05, 2, 'trunk lengths'),
       }),
+    ),
     shoulderRaise: z
       .strictObject({
         targetElevationDeg: num(0, 180, 'deg'),
@@ -94,3 +105,9 @@ export const TargetsConfigSchema = z.strictObject({
 });
 
 export type TargetsConfig = z.infer<typeof TargetsConfigSchema>;
+
+/** Config v1 (M0–M1): v2 without `sitToStand.minStandRise`. Only for validating logs recorded then. */
+export const TargetsConfigV1Schema = TargetsConfigSchema.extend({
+  schemaVersion: z.literal(1),
+  exercises: TargetsConfigSchema.shape.exercises.extend({ sitToStand: sitToStandChecks(SitToStandV1) }),
+});

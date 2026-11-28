@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PoseTraceSchema } from '../../core/trace/schema';
 import { unsupportedTraceReason } from '../../pose/traceSource';
-import type { Side } from '../../core/types';
+import type { BuiltExerciseId, Side } from '../../core/types';
 import { EXERCISE_INFO } from '../exercises';
 import type { Selection } from '../session/phase';
 import styles from './ExerciseSelect.module.css';
@@ -30,15 +30,24 @@ export function ExerciseSelect({ onChoose }: { onChoose: (s: Selection) => void 
             ))}
           </span>
         </li>
-        {(['sitToStand', 'shoulderRaise'] as const).map((id) => (
-          <li key={id}>
-            {/* Built in milestones M2 and M3 (SPEC 4.1 build order). */}
-            <button type="button" className={styles.option} disabled aria-describedby={`${id}-camera`}>
-              <span className={styles.name}>{EXERCISE_INFO[id].name}</span>
-              <span id={`${id}-camera`} className={styles.camera}>{EXERCISE_INFO[id].camera} Coming soon.</span>
-            </button>
-          </li>
-        ))}
+        <li>
+          <button
+            type="button"
+            className={styles.option}
+            aria-describedby="sitToStand-camera"
+            onClick={() => onChoose({ exercise: 'sitToStand', side: null, source: { kind: 'camera' } })}
+          >
+            <span className={styles.name}>{EXERCISE_INFO.sitToStand.name}</span>
+            <span id="sitToStand-camera" className={styles.camera}>{EXERCISE_INFO.sitToStand.camera}</span>
+          </button>
+        </li>
+        <li>
+          {/* Built in milestone M3 (SPEC 4.1 build order). */}
+          <button type="button" className={styles.option} disabled aria-describedby="shoulderRaise-camera">
+            <span className={styles.name}>{EXERCISE_INFO.shoulderRaise.name}</span>
+            <span id="shoulderRaise-camera" className={styles.camera}>{EXERCISE_INFO.shoulderRaise.camera} Coming soon.</span>
+          </button>
+        </li>
       </ul>
       <TraceReplay onChoose={onChoose} />
     </section>
@@ -50,6 +59,7 @@ function TraceReplay({ onChoose }: { onChoose: (s: Selection) => void }) {
   const [loaded, setLoaded] = useState<{ name: string; trace: Selection['source'] & { kind: 'trace' } } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [side, setSide] = useState<Side>('left');
+  const [exercise, setExercise] = useState<BuiltExerciseId>('kneeExtension');
 
   async function onFile(file: File | undefined) {
     setLoaded(null);
@@ -80,25 +90,34 @@ function TraceReplay({ onChoose }: { onChoose: (s: Selection) => void }) {
     <details className={styles.research}>
       <summary>Research: replay a recorded pose trace</summary>
       <p className={styles.camera}>
-        Plays a pose trace file from this device through the knee extension set, pressing Start and Resume automatically.
+        Plays a pose trace file from this device through a set of the chosen exercise, pressing Start and Resume automatically.
       </p>
       <label className={styles.field}>
         Pose trace file (.json)
         <input type="file" accept="application/json,.json" onChange={(e) => void onFile(e.target.files?.[0])} />
       </label>
       <label className={styles.field}>
-        Leg
-        <select value={side} onChange={(e) => setSide(e.target.value as Side)}>
-          <option value="left">Left</option>
-          <option value="right">Right</option>
+        Exercise
+        <select aria-label="Exercise" value={exercise} onChange={(e) => setExercise(e.target.value as BuiltExerciseId)}>
+          <option value="kneeExtension">{EXERCISE_INFO.kneeExtension.name}</option>
+          <option value="sitToStand">{EXERCISE_INFO.sitToStand.name}</option>
         </select>
       </label>
+      {exercise === 'kneeExtension' && (
+        <label className={styles.field}>
+          Leg
+          <select value={side} onChange={(e) => setSide(e.target.value as Side)}>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+        </label>
+      )}
       {error && <p role="alert">{error}</p>}
       <button
         type="button"
         className={styles.side}
         disabled={!loaded}
-        onClick={() => loaded && onChoose({ exercise: 'kneeExtension', side, source: loaded.trace })}
+        onClick={() => loaded && onChoose({ exercise, side: exercise === 'kneeExtension' ? side : null, source: loaded.trace })}
       >
         Replay trace
       </button>

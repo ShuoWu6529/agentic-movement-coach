@@ -69,8 +69,22 @@ describe('targets config', () => {
     expect(problemsOf(c).join('\n')).toMatch(new RegExp(`^${path.replaceAll('.', '\\.')}: `, 'm'));
   });
 
-  it('rejects an unknown schemaVersion', () => {
-    expect(problemsOf({ ...base(), schemaVersion: 2 }).join('\n')).toMatch(/^schemaVersion: /m);
+  it('rejects an unknown schemaVersion, including v1 from before minStandRise (M2)', () => {
+    expect(problemsOf({ ...base(), schemaVersion: 3 }).join('\n')).toMatch(/^schemaVersion: /m);
+    const v1 = base();
+    v1.schemaVersion = 1;
+    delete v1.exercises.sitToStand.minStandRise;
+    const p = problemsOf(v1).join('\n');
+    expect(p).toMatch(/^schemaVersion: /m);
+    expect(p).toMatch(/^exercises\.sitToStand\.minStandRise: /m);
+  });
+
+  it('range-checks minStandRise', () => {
+    for (const v of [0, 3]) {
+      const c = base();
+      c.exercises.sitToStand.minStandRise = v;
+      expect(problemsOf(c).join('\n')).toMatch(/^exercises\.sitToStand\.minStandRise: /m);
+    }
   });
 
   it('only sets dwell times for advice rules that exist', () => {

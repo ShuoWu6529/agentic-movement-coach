@@ -37,8 +37,10 @@ describe('App start-up', () => {
       expect(await screen.findByRole('button', { name })).toBeInTheDocument();
     }
     for (const name of EXERCISES) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
-    // Knee extension is built (M1); the other two follow in M2 and M3 (SPEC 4.1 build order).
+    // Knee extension (M1) and sit-to-stand (M2) are built; shoulder raise follows in M3 (SPEC 4.1 build order).
     expect(screen.getByRole('button', { name: /seated knee extension, left leg/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /sit-to-stand/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /shoulder raise/i })).toBeDisabled();
     expectDisclaimer();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -62,7 +64,7 @@ describe('App start-up', () => {
   });
 
   it('rejects an unknown schemaVersion', async () => {
-    serveConfig({ ...defaultConfig, schemaVersion: 2 });
+    serveConfig({ ...defaultConfig, schemaVersion: 3 });
     render(<App />);
     expect(await screen.findByRole('alert')).toHaveTextContent('schemaVersion');
   });

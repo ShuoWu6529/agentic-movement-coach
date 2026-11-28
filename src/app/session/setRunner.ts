@@ -4,16 +4,15 @@
 
 import type { TargetsConfig } from '../../core/config/schema';
 import type { PoseFrame } from '../../core/pose';
-import { requiredJoints } from '../../core/reliability';
 import { stepWithAutoAdvance, type AutoAdvance } from '../../core/session/replay';
 import type { SetPhase } from '../../core/session/phases';
 import { SetSession, type SetResult, type SetSnapshot } from '../../core/session/setSession';
 import type { PoseTrace, TraceFrame } from '../../core/trace/schema';
-import type { Side } from '../../core/types';
 import { startWatchdog, stallMsFor, type Watchdog } from '../../pose/watchdog';
 import type { FrameSource } from '../../pose/types';
 import { drawPose, type Ctx2d } from '../components/overlay';
 import { LiveStore, type LiveView } from './liveStore';
+import type { Selection } from './phase';
 
 export interface RunnerCallbacks {
   onPhase(phase: Exclude<SetPhase, 'summary'>): void;
@@ -28,7 +27,8 @@ const nextFrame: (cb: () => void) => void =
 export class SetRunner {
   readonly store = new LiveStore();
   private readonly session: SetSession;
-  private readonly joints: number[];
+  /** Joints the gate requires for this exercise, highlighted on the overlay. */
+  readonly joints: readonly number[];
   private ctx: Ctx2d | null = null;
   private watchdog: Watchdog | null = null;
   private traceFrames: TraceFrame[] = [];
@@ -38,13 +38,13 @@ export class SetRunner {
 
   constructor(
     private readonly config: TargetsConfig,
-    side: Side,
+    selection: Pick<Selection, 'exercise' | 'side'>,
     private readonly source: FrameSource,
     private readonly cb: RunnerCallbacks,
     private readonly auto: AutoAdvance = { start: false, resume: false },
   ) {
-    this.session = new SetSession({ config, side, video: source.info.size });
-    this.joints = requiredJoints('kneeExtension', side);
+    this.session = new SetSession({ config, exercise: selection.exercise, side: selection.side, video: source.info.size });
+    this.joints = this.session.joints;
   }
 
   private canvas: HTMLCanvasElement | null = null;
@@ -138,11 +138,16 @@ export class SetRunner {
       framingText: same ? s.framingText : null,
       canStart: same && s.canStart,
       calibrationProgress: same ? s.calibrationProgress : 0,
+      calibrationStage: same ? s.calibrationStage : null,
+      calibrationText: same ? s.calibrationText : null,
       countdownRemainingS: same ? s.countdownRemainingS : null,
       angle: same && s.angle !== null ? Math.round(s.angle) : null,
       reps: s.reps,
       targetReps: s.targetReps,
       holdRemainingS: same && s.holdRemainingMs !== null ? Math.ceil(s.holdRemainingMs / 100) / 10 : null,
+      lastRiseS: same && s.lastRiseMs !== null ? Math.round(s.lastRiseMs / 100) / 10 : null,
+      lastLowerS: same && s.lastLowerMs !== null ? Math.round(s.lastLowerMs / 100) / 10 : null,
+      finishing: same && s.finishing,
       shown: same ? s.shown : null,
       readyToResume: same && s.readyToResume,
     };

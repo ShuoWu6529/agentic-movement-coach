@@ -4,6 +4,7 @@
 import { useId, useState } from 'react';
 import { buildSessionLog } from '../../core/log/build';
 import { SessionLogSchema } from '../../core/log/schema';
+import type { KneeSummary, SitToStandSummary } from '../../core/summary';
 import { compactTrace, downloadJson, fileStamp } from '../download';
 import type { FinishedSet } from '../session/phase';
 import styles from './Summary.module.css';
@@ -14,7 +15,7 @@ export function Summary({ finished, onBack }: { finished: FinishedSet; onBack: (
   const [problem, setProblem] = useState<string | null>(null);
   const noteId = useId();
   const stamp = fileStamp();
-  const base = `knee-extension-${summary.side}-${stamp}`;
+  const base = summary.exercise === 'sitToStand' ? `sit-to-stand-${stamp}` : `knee-extension-${summary.side}-${stamp}`;
 
   function downloadLog() {
     const log = buildSessionLog(finished.result, finished.meta, note);
@@ -31,21 +32,7 @@ export function Summary({ finished, onBack }: { finished: FinishedSet; onBack: (
   return (
     <section aria-labelledby="summary-heading" className={styles.summary}>
       <h1 id="summary-heading" className={styles.heading}>Set summary</h1>
-      <p className={styles.sub}>Seated knee extension, {summary.side} leg</p>
-      <dl className={styles.stats}>
-        <div>
-          <dt>Repetitions</dt>
-          <dd aria-label="Repetitions completed">{summary.reps} / {summary.targetReps}</dd>
-        </div>
-        <div>
-          <dt>Best knee angle</dt>
-          <dd aria-label="Best knee angle">{summary.bestFlexion !== null ? `${Math.round(summary.bestFlexion)}° from straight` : '–'}</dd>
-        </div>
-        <div>
-          <dt>Holds</dt>
-          <dd>{summary.holdsMs.length > 0 ? summary.holdsMs.map((h) => `${(h / 1000).toFixed(1)} s`).join(', ') : '–'}</dd>
-        </div>
-      </dl>
+      {summary.exercise === 'sitToStand' ? <SitToStandStats summary={summary} /> : <KneeStats summary={summary} />}
       {summary.wentWell.length > 0 && (
         <>
           <h2 className={styles.subheading}>Went well</h2>
@@ -79,5 +66,63 @@ export function Summary({ finished, onBack }: { finished: FinishedSet; onBack: (
         <button type="button" className={styles.primary} onClick={onBack}>Back to exercises</button>
       </p>
     </section>
+  );
+}
+
+function KneeStats({ summary }: { summary: KneeSummary }) {
+  return (
+    <>
+      <p className={styles.sub}>Seated knee extension, {summary.side} leg</p>
+      <dl className={styles.stats}>
+        <div>
+          <dt>Repetitions</dt>
+          <dd aria-label="Repetitions completed">{summary.reps} / {summary.targetReps}</dd>
+        </div>
+        <div>
+          <dt>Best knee angle</dt>
+          <dd aria-label="Best knee angle">{summary.bestFlexion !== null ? `${Math.round(summary.bestFlexion)}° from straight` : '–'}</dd>
+        </div>
+        <div>
+          <dt>Holds</dt>
+          <dd>{summary.holdsMs.length > 0 ? summary.holdsMs.map((h) => `${(h / 1000).toFixed(1)} s`).join(', ') : '–'}</dd>
+        </div>
+      </dl>
+    </>
+  );
+}
+
+const sec = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+const range = ([lo, hi]: readonly [number, number]) => `target ${lo / 1000}–${hi / 1000} s`;
+
+/** Sit-to-stand measures no angle; its summary reports tempo instead (AC 6, AC 11; PLANS.md M2). */
+function SitToStandStats({ summary }: { summary: SitToStandSummary }) {
+  return (
+    <>
+      <p className={styles.sub}>Sit-to-stand</p>
+      <dl className={styles.stats}>
+        <div>
+          <dt>Repetitions</dt>
+          <dd aria-label="Repetitions completed">{summary.reps} / {summary.targetReps}</dd>
+        </div>
+        <div>
+          <dt>Average stand-up time</dt>
+          <dd aria-label="Average rise time">
+            {summary.meanRiseMs !== null ? `${sec(summary.meanRiseMs)} (${range(summary.riseRange)})` : '–'}
+          </dd>
+        </div>
+        <div>
+          <dt>Average sit-down time</dt>
+          <dd aria-label="Average lower time">
+            {summary.meanLowerMs !== null ? `${sec(summary.meanLowerMs)} (${range(summary.lowerRange)})` : '–'}
+          </dd>
+        </div>
+        <div>
+          <dt>Each repetition (up / down)</dt>
+          <dd aria-label="Tempo per repetition">
+            {summary.riseMs.length > 0 ? summary.riseMs.map((r, i) => `${sec(r)} / ${sec(summary.lowerMs[i]!)}`).join(', ') : '–'}
+          </dd>
+        </div>
+      </dl>
+    </>
   );
 }

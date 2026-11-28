@@ -5,7 +5,7 @@
 // were ever recorded, so there is no migration.
 
 import { z } from 'zod';
-import { TargetsConfigSchema } from '../config/schema';
+import { TargetsConfigSchema, TargetsConfigV1Schema } from '../config/schema';
 import { EXERCISE_IDS } from '../types';
 
 export const FrameRowSchema = z.strictObject({
@@ -56,7 +56,12 @@ export const LogEventSchema = z.discriminatedUnion('type', [
 export const SessionLogSchema = z.strictObject({
   schemaVersion: z.literal(2),
   app: z.strictObject({ version: z.string(), gitSha: z.string() }),
-  config: z.strictObject({ hash: z.string().regex(/^[0-9a-f]{64}$/), value: TargetsConfigSchema }),
+  // The effective config, validated against the config version it declares: v2 since M2, v1 in logs
+  // recorded during M1 (the log's own fields did not change, so the log stays v2).
+  config: z.strictObject({
+    hash: z.string().regex(/^[0-9a-f]{64}$/),
+    value: z.discriminatedUnion('schemaVersion', [TargetsConfigSchema, TargetsConfigV1Schema]),
+  }),
   exercise: z.enum(EXERCISE_IDS),
   /** Anatomical side, not mirrored. */
   side: z.enum(['left', 'right']).optional(),

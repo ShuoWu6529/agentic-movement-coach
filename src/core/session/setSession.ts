@@ -1,32 +1,40 @@
-// One set of seated knee extension, frame by frame (PLANS.md §3, §6). Pure and clock-free: the only
-// time it sees is each frame's `t`, so the same code runs live, on traces in tests, and in replay.
+// One set of an exercise, frame by frame (PLANS.md §3, §6). Pure and clock-free: the only time it
+// sees is each frame's `t`, so the same code runs live, on traces in tests, and in replay.
 //
-// Per frame: smoothing → per-frame gate → phase logic → CueGate → log row.
+// Per frame: smoothing → per-frame gate → phase logic → CueGate → log row. The exercise (knee
+// extension, sit-to-stand) supplies measurements, calibration, counting and conditions; gating is the
+// same for every exercise.
 // - A bad frame in the active set closes the cue gate at once and discards the attempt in progress.
 //   If bad frames last `tracking.unreliableAfterMs`, the phase changes to trackingLost.
 // - In trackingLost, only status messages show. After `tracking.recoverAfterMs` of reliable frames the
 //   patient may Resume, which runs a short framing check and the countdown. Completed reps are kept.
 // - Losing tracking in calibration restarts calibration; in the countdown it returns to framing.
+// - The frame that completes the last repetition ends the set, unless an advice condition about the
+//   final attempt holds on it (a sit-to-stand lowered too fast, say). Then counting stops and the set
+//   screen stays up until that cue has been shown for `cues.displayMs` (or can no longer be shown),
+//   and an unreliable frame ends it at once (docs/definitions.md).
 
-import { Calibration } from '../calibration';
+import type { Baseline } from '../calibration';
 import type { TargetsConfig } from '../config/schema';
-import { KneeExtensionEngine, type AttemptRecord } from '../exercises/kneeExtension';
-import { FramingCheck, framingMessage, type FramingStatus } from '../framing';
-import { kneeFlexion2d, kneeFlexion3d } from '../geometry';
+import type { AttemptRecord, CalibrationStage, Exercise } from '../exercises/exercise';
+import { createExercise } from '../exercises';
+import { FramingCheck, framingMessage, gateIssue, type FramingStatus } from '../framing';
 import type { FrameRow, LogEvent } from '../log/schema';
 import type { PoseFrame } from '../pose';
-import { gateFrame, requiredJoints, type GateResult } from '../reliability';
+import { gateFrame, type GateResult } from '../reliability';
 import { CueGate, type CueCandidate, type CueCommit } from '../rules/cueGate';
 import type { RuleId } from '../rules/registry';
 import { EmaSmoother } from '../smoothing';
-import { buildSummary, type SetSummary } from '../summary';
-import type { Side } from '../types';
+import type { SetSummary } from '../summary';
+import type { BuiltExerciseId, Side } from '../types';
 import { isLegalSetTransition, type SetPhase } from './phases';
 
 export interface SetSessionOptions {
   config: TargetsConfig;
-  side: Side;
-  /** Frame size in pixels, for image-plane angles. */
+  exercise: BuiltExerciseId;
+  /** Anatomical side for knee extension; null for sit-to-stand. */
+  side: Side | null;
+  /** Frame size in pixels, for image-plane measurements. */
   video: { width: number; height: number };
 }
 
@@ -42,24 +50,34 @@ export interface SetSnapshot {
   framingText: string | null;
   canStart: boolean;
   calibrationProgress: number;
+  /** Calibration stage while calibrating, otherwise null. */
+  calibrationStage: CalibrationStage | null;
+  /** What to fix when tracking fails during calibration. */
+  calibrationText: string | null;
   countdownRemainingS: number | null;
-  /** Primary knee flexion this frame; null when tracking is unreliable. */
+  /** Primary knee flexion this frame; null when tracking is unreliable or for other exercises. */
   angle: number | null;
   reps: number;
   targetReps: number;
   holdRemainingMs: number | null;
-  holdTargetMs: number;
+  /** Rise and lower time of the last sit-to-stand repetition; null when tracking is unreliable. */
+  lastRiseMs: number | null;
+  lastLowerMs: number | null;
   /** Cue or status rule shown this frame. */
   shown: RuleId | null;
   commit: CueCommit | null;
   readyToResume: boolean;
+  /** True after the last repetition while its final advice cue is on screen. */
+  finishing: boolean;
 }
 
 export interface SetResult {
+  exercise: BuiltExerciseId;
+  side: Side | null;
   summary: SetSummary;
   frames: FrameRow[];
   events: LogEvent[];
-  calibration: { t: number; baseline: Record<string, number> };
+  calibration: Baseline;
 }
 
 const round = (v: number | null, digits: number): number | null =>
@@ -67,14 +85,10 @@ const round = (v: number | null, digits: number): number | null =>
 
 export class SetSession {
   private readonly cfg: TargetsConfig;
-  private readonly side: Side;
-  private readonly video: { width: number; height: number };
-  private readonly joints: number[];
+  private readonly ex: Exercise;
   private readonly smoother: EmaSmoother;
   private readonly framing: FramingCheck;
-  private calibration: Calibration | null = null;
-  private calibrated: { t: number; baseline: Record<string, number> } | null = null;
-  private readonly engine: KneeExtensionEngine;
+  private calibrated: Baseline | null = null;
   private readonly cueGate: CueGate;
 
   private phaseNow: SetPhase = 'framing';
@@ -87,7 +101,8 @@ export class SetSession {
   private goodSince: number | null = null;
   private ready = false;
   private trackingLosses = 0;
-  private bestFlexion: number | null = null;
+  /** Advice conditions held on the frame that completed the last repetition, still to be shown. */
+  private finalCues: CueCandidate[] | null = null;
 
   private readonly frames: FrameRow[] = [];
   private readonly events: LogEvent[] = [];
@@ -98,17 +113,19 @@ export class SetSession {
 
   constructor(opts: SetSessionOptions) {
     this.cfg = opts.config;
-    this.side = opts.side;
-    this.video = opts.video;
-    this.joints = requiredJoints('kneeExtension', opts.side);
+    this.ex = createExercise(opts.exercise, opts.config, opts.side, opts.video);
     this.smoother = new EmaSmoother(opts.config.smoothing.alpha);
-    this.framing = new FramingCheck(opts.config, opts.side);
-    this.engine = new KneeExtensionEngine(opts.config.exercises.kneeExtension);
+    this.framing = new FramingCheck(opts.config, this.ex.framingSide);
     this.cueGate = new CueGate(opts.config.cues);
   }
 
   get phase(): SetPhase {
     return this.phaseNow;
+  }
+
+  /** Joints the gate requires, for the overlay. */
+  get joints(): readonly number[] {
+    return this.ex.joints;
   }
 
   /** True between Resume and the restart of the set. */
@@ -128,17 +145,15 @@ export class SetSession {
     if (this.lastT === null) this.events.push({ type: 'phase', t, phase: 'framing' });
     this.lastT = t;
 
+    const ex = this.ex;
     const f = this.smoother.apply(raw);
-    const gate = gateFrame(f.lm, this.joints, this.cfg.tracking);
-    const angles: Record<string, number | null> = { kneeFlexion: null, kneeFlexion3d: null };
-    if (gate.ok && f.lm && f.world) {
-      angles.kneeFlexion = kneeFlexion2d(f.lm, this.side, this.video.width, this.video.height);
-      angles.kneeFlexion3d = kneeFlexion3d(f.world, this.side);
-    }
-    const flexion = angles.kneeFlexion ?? null;
+    const gate = gateFrame(f.lm, ex.joints, this.cfg.tracking);
+    const m = gate.ok && f.lm && f.world ? ex.measure(f) : ex.blank();
+    const value = gate.ok ? ex.input(m) : null;
     let framing: FramingStatus | null = null;
     let calibrationProgress = 0;
-    const events: CueCandidate[] = [];
+    let calibrationText: string | null = null;
+    let events: CueCandidate[] = [];
     let attemptStarted: number | null = null;
 
     switch (this.phaseNow) {
@@ -147,20 +162,19 @@ export class SetSession {
         this.lastFraming = framing;
         if (framing.passed && this.resuming) this.enterCountdown(t);
         break;
-      case 'calibration': {
-        const cal = this.calibration!;
-        if (!gate.ok || flexion === null) {
-          cal.reset();
+      case 'calibration':
+        if (!gate.ok) {
+          ex.resetCalibration();
+          calibrationText = framingMessage(gateIssue(f, gate, this.cfg), ex.framingSide);
         } else {
-          const s = cal.step(f, angles);
+          const s = ex.calibrate(f, m);
           calibrationProgress = s.progress;
           if (s.done) {
-            this.calibrated = cal.baseline;
+            this.calibrated = ex.calibration;
             this.enterCountdown(t);
           }
         }
         break;
-      }
       case 'countdown':
         if (!gate.ok) {
           this.framing.reset();
@@ -173,9 +187,10 @@ export class SetSession {
         }
         break;
       case 'active':
-        if (!gate.ok || flexion === null) {
+        if (this.finalCues) break; // counting has stopped after the last repetition
+        if (value === null) {
           this.badSince ??= t;
-          const kept = this.engine.discard(t);
+          const kept = ex.discard(t);
           if (kept) this.recordAttempt(kept);
           if (t - this.badSince >= this.cfg.tracking.unreliableAfterMs) {
             this.events.push({ type: 'tracking_lost', t, firstBadT: this.badSince });
@@ -186,11 +201,10 @@ export class SetSession {
           }
         } else {
           this.badSince = null;
-          const r = this.engine.step(t, flexion);
+          const r = ex.step(t, value);
           attemptStarted = r.startedAttempt;
           if (r.ended) this.recordAttempt(r.ended);
-          if (r.repCounted) events.push({ ruleId: 'KE-HOLD-DONE', attemptIndex: r.countedAttempt });
-          this.bestFlexion = this.bestFlexion === null ? flexion : Math.min(this.bestFlexion, flexion);
+          events = r.events;
         }
         break;
       case 'trackingLost':
@@ -208,19 +222,48 @@ export class SetSession {
     }
 
     const lost = this.phaseNow === 'trackingLost';
-    // The frame that completes the last repetition ends the set: the summary replaces the set screen
-    // at once, so no cue is committed on it (a cue that never reaches the display is not logged).
-    const finishing = this.phaseNow === 'active' && this.engine.reps >= this.cfg.exercises.kneeExtension.reps;
-    const open = this.phaseNow === 'active' && gate.ok && flexion !== null && !finishing;
+    const usable = this.phaseNow === 'active' && value !== null;
+    let open = false;
+    let conditions: CueCandidate[] = [];
+    let finishNow = false;
+    if (this.phaseNow === 'active') {
+      if (this.finalCues) {
+        open = usable;
+        conditions = usable ? this.finalCues : [];
+        finishNow = !usable;
+      } else if (ex.reps >= ex.targetReps) {
+        // The frame that completes the last repetition. Positive feedback is not shown on it, because
+        // the summary replaces the set screen; advice about the final attempt is shown first.
+        const final = ex.conditions();
+        if (final.length > 0) {
+          this.finalCues = final;
+          open = true;
+          conditions = final;
+        } else {
+          finishNow = true;
+        }
+        events = [];
+      } else {
+        open = usable;
+        conditions = open ? ex.conditions() : [];
+      }
+    }
     const out = this.cueGate.step(t, {
-      open,
-      conditions: open ? this.engine.conditions() : [],
+      open: open && !finishNow,
+      conditions,
       events: open ? events : [],
       status: lost ? (this.ready ? 'ST-READY-RESUME' : 'ST-TRACKING-LOST') : null,
       attemptStarted: open ? attemptStarted : null,
     });
-    if (out.commit) {
-      const c = out.commit;
+    if (this.finalCues && !finishNow) {
+      const waiting = this.finalCues.some((c) => this.cueGate.isPending(c) || c.ruleId === out.shown);
+      finishNow = !waiting;
+    }
+    // A frame that ends the set shows no cue: the summary replaces the set screen on it.
+    const shown = finishNow ? null : out.shown;
+    const commit = finishNow ? null : out.commit;
+    if (commit) {
+      const c = commit;
       const ev = { type: 'cue' as const, ruleId: c.ruleId, attemptIndex: c.attemptIndex, onsetT: c.onsetT, confirmT: c.confirmT, shownAt: c.confirmT };
       this.cueEvents.set(c.seq, ev);
       this.events.push(ev);
@@ -229,17 +272,18 @@ export class SetSession {
     const inSet = this.phaseNow === 'active' || this.phaseNow === 'trackingLost';
     this.frames.push({
       t,
-      angles: { kneeFlexion: round(angles.kneeFlexion ?? null, 1), kneeFlexion3d: round(angles.kneeFlexion3d ?? null, 1) },
-      state: inSet ? this.engine.state : this.phaseNow,
+      angles: ex.logged(m),
+      state: inSet ? ex.state : this.phaseNow,
       trackingOk: gate.ok,
       conf: round(gate.conf, 3) ?? 0,
-      cue: out.shown,
-      rep: this.engine.reps,
+      cue: shown,
+      rep: ex.reps,
     });
 
-    if (finishing) this.finish(t);
+    const finishing = this.finalCues !== null && !finishNow;
+    if (finishNow) this.finish(t);
 
-    const hold = this.phaseNow === 'active' ? this.engine.holdRemainingMs() : null;
+    const live = this.phaseNow === 'active' ? ex.live(open ? value : null) : null;
     this.last = {
       t,
       phase: this.phaseNow,
@@ -247,21 +291,25 @@ export class SetSession {
       gate,
       lm: f.lm,
       framing,
-      framingText: framing?.issue ? framingMessage(framing.issue, this.side) : null,
+      framingText: framing?.issue ? framingMessage(framing.issue, ex.framingSide) : null,
       canStart: this.phaseNow === 'framing' && !this.resuming && (framing?.passed ?? false),
       calibrationProgress,
+      calibrationStage: this.phaseNow === 'calibration' ? ex.calibrationStage() : null,
+      calibrationText,
       countdownRemainingS:
         this.phaseNow === 'countdown'
           ? Math.max(0, Math.ceil((this.cfg.countdownSeconds * 1000 - (t - this.countdownStart)) / 1000))
           : null,
-      angle: open ? flexion : null,
-      reps: this.engine.reps,
-      targetReps: this.cfg.exercises.kneeExtension.reps,
-      holdRemainingMs: hold,
-      holdTargetMs: this.cfg.exercises.kneeExtension.holdSeconds * 1000,
-      shown: out.shown,
-      commit: out.commit,
+      angle: open ? (live?.angle ?? null) : null,
+      reps: ex.reps,
+      targetReps: ex.targetReps,
+      holdRemainingMs: live?.holdRemainingMs ?? null,
+      lastRiseMs: open ? (live?.lastRiseMs ?? null) : null,
+      lastLowerMs: open ? (live?.lastLowerMs ?? null) : null,
+      shown,
+      commit,
       readyToResume: lost && this.ready,
+      finishing,
     };
     return this.last;
   }
@@ -269,7 +317,7 @@ export class SetSession {
   /** "Start set": only once the framing check passes (AC 3); calibration comes first (AC 4). */
   startSet(): boolean {
     if (this.phaseNow !== 'framing' || this.resuming || !this.lastFraming?.passed || this.lastT === null) return false;
-    this.calibration = new Calibration(this.cfg.calibration, this.joints);
+    this.ex.beginCalibration();
     this.setPhase('calibration', this.lastT);
     return true;
   }
@@ -299,7 +347,14 @@ export class SetSession {
 
   result(): SetResult | null {
     if (!this.summary || !this.calibrated) return null;
-    return { summary: this.summary, frames: this.frames, events: this.events, calibration: this.calibrated };
+    return {
+      exercise: this.ex.id,
+      side: this.ex.side,
+      summary: this.summary,
+      frames: this.frames,
+      events: this.events,
+      calibration: this.calibrated,
+    };
   }
 
   private enterCountdown(t: number): void {
@@ -309,25 +364,22 @@ export class SetSession {
 
   private recordAttempt(a: AttemptRecord): void {
     this.attempts.push(a);
-    this.events.push({
+    const ev: Extract<LogEvent, { type: 'attempt' }> = {
       type: 'attempt', t: a.tEnd, tStart: a.tStart, index: a.index, counted: a.counted,
-      peak: round(a.peak, 1) ?? a.peak, holdMs: Math.round(a.holdMs), issues: a.issues,
-    });
+      peak: round(a.peak, this.ex.id === 'sitToStand' ? 3 : 1) ?? a.peak, issues: a.issues,
+    };
+    if (a.holdMs !== undefined) ev.holdMs = Math.round(a.holdMs);
+    if (a.riseMs !== undefined) ev.riseMs = Math.round(a.riseMs);
+    if (a.lowerMs !== undefined) ev.lowerMs = Math.round(a.lowerMs);
+    this.events.push(ev);
   }
 
   private finish(t: number): void {
-    const kept = this.engine.discard(t);
+    const kept = this.ex.discard(t);
     if (kept) this.recordAttempt(kept);
+    this.finalCues = null;
     this.setPhase('summary', t);
-    const ke = this.cfg.exercises.kneeExtension;
-    this.summary = buildSummary({
-      side: this.side,
-      targetReps: ke.reps,
-      holdSeconds: ke.holdSeconds,
-      attempts: this.attempts,
-      bestFlexion: round(this.bestFlexion, 1),
-      trackingLosses: this.trackingLosses,
-    });
+    this.summary = this.ex.summary(this.attempts, this.trackingLosses);
   }
 
   private setPhase(to: SetPhase, t: number): void {

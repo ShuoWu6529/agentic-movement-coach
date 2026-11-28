@@ -8,12 +8,13 @@ import type { SessionMeta } from '../../core/log/build';
 import { SET_TRANSITIONS, type SetPhase } from '../../core/session/phases';
 import type { SetResult } from '../../core/session/setSession';
 import type { PoseTrace } from '../../core/trace/schema';
-import type { Side } from '../../core/types';
+import type { BuiltExerciseId, Side } from '../../core/types';
 import type { CameraErrorKind } from '../../pose/cameraErrors';
 
 export interface Selection {
-  exercise: 'kneeExtension';
-  side: Side;
+  exercise: BuiltExerciseId;
+  /** Anatomical side for knee extension; null for sit-to-stand. */
+  side: Side | null;
   source: { kind: 'camera' } | { kind: 'trace'; name: string; trace: PoseTrace };
 }
 
