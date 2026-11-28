@@ -15,6 +15,7 @@ export type FramingIssue =
   | { kind: 'joint'; joint: number; problem: 'outOfFrame' | 'lowVisibility' }
   | { kind: 'side' }
   | { kind: 'slow'; fps: number }
+  | { kind: 'distance' }
   | { kind: 'settling' };
 
 export interface FramingStatus {
@@ -87,6 +88,7 @@ export class FramingCheck {
 /** What is wrong with a frame the gate refused, for the framing message (also used in calibration). */
 export function gateIssue(frame: PoseFrame, gate: GateResult, config: TargetsConfig): FramingIssue {
   if (frame.luma !== undefined && frame.luma < config.framing.minLuma) return { kind: 'dim' };
+  if (gate.reason === 'scale') return { kind: 'distance' };
   if (gate.reason === 'noPose' || gate.joint === null) return { kind: 'noPose' };
   return { kind: 'joint', joint: gate.joint, problem: gate.reason === 'outOfFrame' ? 'outOfFrame' : 'lowVisibility' };
 }
@@ -108,6 +110,8 @@ export function framingMessage(issue: FramingIssue, side: Side | null): string {
         : 'Turn so the camera sees you from the front and a little to one side.';
     case 'slow':
       return 'Tracking is running slowly on this device. Close other apps or tabs, then try again.';
+    case 'distance':
+      return 'Go back to where you were when the set started, at the same distance from the camera.';
     case 'settling':
       return 'Good. Hold still for a moment…';
   }

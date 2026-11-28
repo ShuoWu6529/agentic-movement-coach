@@ -254,6 +254,9 @@ export class KneeExtensionExercise implements Exercise {
     return { done: s.done, progress: s.progress, stage: 'seated' };
   }
 
+  checkInSet(): null {
+    return null;
+  }
   input(m: Measures): number | null {
     return m.kneeFlexion ?? null;
   }

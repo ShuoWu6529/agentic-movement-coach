@@ -199,6 +199,40 @@ describe('sit-to-stand set on synthetic traces', () => {
     expect(new Set(repsWhileLost)).toEqual(new Set([0]));
   });
 
+  it('does not count a stand followed by walking toward the camera, which looks like sitting down', () => {
+    // As in the owner's manual set: stand up, then walk to the laptop. The body grows in the picture,
+    // then the shoulders drop within a frame or two while every joint is still visible, then no pose.
+    const walkToLaptop: StsSegment[] = [
+      ...STS_SETTLE, ...cycle(),
+      { ms: 1000, from: 0, to: 1 }, { ms: 400, p: 1 },
+      { ms: 900, p: 1, scaleTo: 1.8 },
+      // In the real set the shoulders ended below their seated height (progress about −0.5).
+      { ms: 70, from: 1, to: -0.5, scale: 1.8 }, { ms: 100, p: -0.5, scale: 1.8 },
+      { ms: 1500, noPose: true }, { ms: 2000, p: 0 },
+    ];
+    const t = trace(walkToLaptop);
+    const { log, summary, snapshots } = run(t);
+    expect(summary.reps).toBe(1); // only the real cycle
+    expect(attempts(log)).toHaveLength(1); // the approach discarded the second attempt
+    const refused = snapshots.filter((s) => s.gate.reason === 'scale');
+    expect(refused.length).toBeGreaterThan(0);
+    const firstRefused = refused[0]!.t;
+    const lost = log.events.find((e) => e.type === 'tracking_lost')!;
+    expect(lost.type === 'tracking_lost' && lost.firstBadT).toBe(firstRefused);
+    for (const f of log.frames.filter((x) => x.t >= firstRefused && x.t < firstRefused + 300)) {
+      expect(f).toMatchObject({ trackingOk: false, cue: null, angles: { standProgress: null } });
+    }
+    expect(logInvariantProblems(log)).toEqual([]);
+    // Without the guard, the approach would have counted as a second repetition.
+    expect(run(t, withSts({ maxScaleChange: 1 })).summary.reps).toBe(2);
+  });
+
+  it('keeps counting when the body size stays within maxScaleChange', () => {
+    const { summary } = run(trace([...STS_SETTLE, ...cycle(), { ms: 500, p: 0, scaleTo: 1.15 },
+      ...cycle().map((s) => ({ ...s, scale: 1.15 })), ...cycle().map((s) => ({ ...s, scale: 1.15 }))]));
+    expect(summary.reps).toBe(3);
+  });
+
   it('keeps calibrating, and names the shoulder, when standing takes the shoulders out of the picture', () => {
     // Shoulders rise 215 px from y = 220, past the top margin of a 480 px frame.
     const { snapshots, result } = run(trace([...STS_SETTLE, { ms: 3000, p: 0 }], { risePx: 215 }));
@@ -238,7 +272,7 @@ describe('sit-to-stand set on synthetic traces', () => {
     const parsed = SessionLogSchema.safeParse(log);
     expect(parsed.success, JSON.stringify(parsed.error?.issues.slice(0, 3))).toBe(true);
     expect(logInvariantProblems(log)).toEqual([]);
-    for (const f of log.frames) expect(Object.keys(f.angles).sort()).toEqual(['shoulderY', 'standProgress']);
+    for (const f of log.frames) expect(Object.keys(f.angles).sort()).toEqual(['shoulderWidthPx', 'shoulderY', 'standProgress']);
     for (const a of attempts(log).filter((x) => x.counted)) {
       expect(a.riseMs).toEqual(expect.any(Number));
       expect(a.lowerMs).toEqual(expect.any(Number));

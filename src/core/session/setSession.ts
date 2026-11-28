@@ -147,8 +147,15 @@ export class SetSession {
 
     const ex = this.ex;
     const f = this.smoother.apply(raw);
-    const gate = gateFrame(f.lm, ex.joints, this.cfg.tracking);
-    const m = gate.ok && f.lm && f.world ? ex.measure(f) : ex.blank();
+    let gate = gateFrame(f.lm, ex.joints, this.cfg.tracking);
+    let m = gate.ok && f.lm && f.world ? ex.measure(f) : ex.blank();
+    // In the active set the exercise may refuse a frame the joint gate passed (sit-to-stand's
+    // body-size guard). It is then unreliable in every respect: no angles, no cue, attempt discarded.
+    const refused = this.phaseNow === 'active' && gate.ok ? ex.checkInSet(m) : null;
+    if (refused) {
+      gate = { ok: false, reason: refused, conf: gate.conf, joint: null };
+      m = ex.blank();
+    }
     const value = gate.ok ? ex.input(m) : null;
     let framing: FramingStatus | null = null;
     let calibrationProgress = 0;

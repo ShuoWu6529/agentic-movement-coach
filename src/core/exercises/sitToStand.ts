@@ -5,6 +5,9 @@
 //   legs (M0.5 S6). Both shoulders are averaged, so left and right are treated alike.
 // - Calibration has two stages: a still seated hold, then a still standing hold whose shoulders are at
 //   least `minStandRise` seated trunk lengths above the seated height.
+// - Body-size guard: during the set, a frame whose shoulder width differs from the calibrated width by
+//   more than `maxScaleChange` is unreliable, because the progress scale no longer holds (the patient
+//   walked toward or away from the camera, for example to reach the laptop).
 // - An attempt starts when progress rises above `sitFrac` and ends when it returns to `sitFrac` or
 //   below. It counts as a repetition when progress reached `standFrac` in between; the counter
 //   increments when the patient is seated again (one full sit, stand, sit cycle, AC 10).
@@ -17,6 +20,7 @@
 import { Calibration, type Baseline } from '../calibration';
 import type { TargetsConfig } from '../config/schema';
 import { imagePoint, LM, TRUNK_JOINTS, type PoseFrame } from '../pose';
+import type { GateReason } from '../reliability';
 import type { CueCandidate } from '../rules/cueGate';
 import type { IssueCategory, RuleId } from '../rules/registry';
 import { buildSitToStandSummary, type SitToStandSummary } from '../summary';
@@ -182,6 +186,14 @@ function trunkPx(lm: readonly number[], width: number, height: number): number |
   return Number.isFinite(d) && d > 0 ? d : null;
 }
 
+/** Distance between the shoulders in the picture, in pixels: the body-size reference. */
+function shoulderWidthPx(lm: readonly number[], width: number, height: number): number | null {
+  const ls = imagePoint(lm, LM.leftShoulder);
+  const rs = imagePoint(lm, LM.rightShoulder);
+  const d = Math.hypot((ls.x - rs.x) * width, (ls.y - rs.y) * height);
+  return Number.isFinite(d) && d > 0 ? d : null;
+}
+
 /**
  * Two-stage calibration: a still seated hold gives the seated shoulder height and trunk length; then a
  * still standing hold, at least `minStandRise` trunk lengths higher, gives the standing height. A still
@@ -223,12 +235,13 @@ export class SitToStandCalibration {
     if (this.result) return { done: true, progress: 1, stage: 'standing' };
     const y = m.shoulderY ?? null;
     const trunk = m.trunkPx ?? null;
-    if (y === null || trunk === null) {
+    const w = m.shoulderWidthPx ?? null;
+    if (y === null || trunk === null || w === null) {
       this.reset();
       return { done: false, progress: 0, stage: this.stageNow };
     }
     if (this.stageNow === 'seated') {
-      const s = this.seated.step(f, { seatedShoulderY: y, trunkPx: trunk });
+      const s = this.seated.step(f, { seatedShoulderY: y, trunkPx: trunk, seatedShoulderWidthPx: w });
       if (!s.done) return { done: false, progress: s.progress, stage: 'seated' };
       this.seatedBaseline = this.seated.baseline;
       this.stageNow = 'standing';
@@ -240,7 +253,7 @@ export class SitToStandCalibration {
       this.standing.reset();
       return { done: false, progress: 0, stage: 'standing' };
     }
-    const s = this.standing.step(f, { standingShoulderY: y });
+    const s = this.standing.step(f, { standingShoulderY: y, standingShoulderWidthPx: w });
     if (!s.done) return { done: false, progress: s.progress, stage: 'standing' };
     this.result = { t: f.t, baseline: { ...seated, ...this.standing.baseline!.baseline } };
     return { done: true, progress: 1, stage: 'standing' };
@@ -288,6 +301,7 @@ export class SitToStandExercise implements Exercise {
     if (!f.lm) return m;
     m.shoulderY = shoulderY(f.lm, this.video.height);
     m.trunkPx = trunkPx(f.lm, this.video.width, this.video.height);
+    m.shoulderWidthPx = shoulderWidthPx(f.lm, this.video.width, this.video.height);
     const b = this.cal.baseline?.baseline;
     if (b && m.shoulderY !== null) {
       m.standProgress = (b.seatedShoulderY! - m.shoulderY) / (b.seatedShoulderY! - b.standingShoulderY!);
@@ -296,11 +310,15 @@ export class SitToStandExercise implements Exercise {
   }
 
   blank(): Measures {
-    return { standProgress: null, shoulderY: null, trunkPx: null };
+    return { standProgress: null, shoulderY: null, trunkPx: null, shoulderWidthPx: null };
   }
 
   logged(m: Measures): Measures {
-    return { standProgress: round(m.standProgress ?? null, 3), shoulderY: round(m.shoulderY ?? null, 1) };
+    return {
+      standProgress: round(m.standProgress ?? null, 3),
+      shoulderY: round(m.shoulderY ?? null, 1),
+      shoulderWidthPx: round(m.shoulderWidthPx ?? null, 1),
+    };
   }
 
   beginCalibration(): void {
@@ -316,6 +334,14 @@ export class SitToStandExercise implements Exercise {
     return this.cal.step(f, m);
   }
 
+  checkInSet(m: Measures): GateReason | null {
+    const b = this.cal.baseline?.baseline;
+    const w = m.shoulderWidthPx ?? null;
+    if (!b || w === null) return null;
+    // Shoulders look a little wider standing than seated, so the reference is the mean of the two holds.
+    const ref = (b.seatedShoulderWidthPx! + b.standingShoulderWidthPx!) / 2;
+    return Math.abs(w / ref - 1) > this.config.exercises.sitToStand.maxScaleChange ? 'scale' : null;
+  }
   input(m: Measures): number | null {
     return m.standProgress ?? null;
   }
