@@ -208,7 +208,7 @@ function Hud({
             {view?.calibrationText ?? prompt}
           </p>
           <progress max={1} value={view?.calibrationProgress ?? 0} aria-label="Calibration progress" />
-          <div className={styles.actions}>{back}</div>
+          <div className={styles.actions}>{resuming ? endSet : back}</div>
         </div>
       );
     }

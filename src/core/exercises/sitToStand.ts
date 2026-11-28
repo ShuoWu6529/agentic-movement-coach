@@ -8,6 +8,8 @@
 // - Body-size guard: during the set, a frame whose shoulder width differs from the calibrated width by
 //   more than `maxScaleChange` is unreliable, because the progress scale no longer holds (the patient
 //   walked toward or away from the camera, for example to reach the laptop).
+// - After tracking loss, Resume repeats both calibration holds, because the camera may have moved
+//   while the patient was at the laptop.
 // - An attempt starts when progress rises above `sitFrac` and ends when it returns to `sitFrac` or
 //   below. It counts as a repetition when progress reached `standFrac` in between; the counter
 //   increments when the patient is seated again (one full sit, stand, sit cycle, AC 10).
@@ -265,6 +267,7 @@ const round = (v: number | null, digits: number): number | null =>
 
 export class SitToStandExercise implements Exercise {
   readonly id = 'sitToStand' as const;
+  readonly recalibrateOnResume = true;
   readonly side = null;
   readonly framingSide = null;
   readonly joints = TRUNK_JOINTS;

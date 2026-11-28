@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cycle, sitToStandTrace, STS_SETTLE, type StsSegment } from '../../../fixtures/synthetic/sitToStandTrace';
+import { cycle, sitToStandTrace, STS_RESUME, STS_SETTLE, type StsSegment } from '../../../fixtures/synthetic/sitToStandTrace';
 import type { TargetsConfig } from '../config/schema';
 import { buildSessionLog } from '../log/build';
 import { logInvariantProblems } from '../log/invariants';
@@ -177,12 +177,13 @@ describe('sit-to-stand set on synthetic traces', () => {
 
   it('pauses within unreliableAfterMs, discards the rise in progress and keeps completed reps (AC 16, 17)', () => {
     const { log, summary } = run(trace([...STS_SETTLE, ...cycle(),
-      { ms: 1500, from: 0, to: 0.7 }, { ms: 1500, noPose: true }, { ms: 1500, p: 0 }, // covered mid-rise
-      { ms: 1200, p: 0 }, { ms: 3500, p: 0 }, ...cycle()]));
+      { ms: 1500, from: 0, to: 0.7 }, { ms: 1500, noPose: true }, // covered mid-rise
+      ...STS_RESUME, ...cycle()]));
     const lost = log.events.find((e) => e.type === 'tracking_lost')!;
     expect(lost.type === 'tracking_lost' && lost.t - lost.firstBadT).toBeGreaterThanOrEqual(config.tracking.unreliableAfterMs);
     expect(lost.type === 'tracking_lost' && lost.t - lost.firstBadT).toBeLessThanOrEqual(config.tracking.unreliableAfterMs + 40);
-    expect(phases(log)).toEqual(['framing', 'calibration', 'countdown', 'active', 'trackingLost', 'framing', 'countdown', 'active', 'summary']);
+    // Resume runs the short framing check and then both calibration holds again.
+    expect(phases(log)).toEqual(['framing', 'calibration', 'countdown', 'active', 'trackingLost', 'framing', 'calibration', 'countdown', 'active', 'summary']);
     expect(summary.reps).toBe(2);
     expect(attempts(log).map((a) => a.index)).toEqual([0, 2]); // attempt 1 was discarded
     expect(summary.trackingLosses).toBe(1);
@@ -191,12 +192,24 @@ describe('sit-to-stand set on synthetic traces', () => {
   it('does not count a stand completed while tracking was lost (AC 17)', () => {
     // Covered while standing; uncovered once seated again. The lost cycle is never counted.
     const { log, summary } = run(trace([...STS_SETTLE, { ms: 3000, from: 0, to: 1 }, { ms: 300, p: 1 },
-      { ms: 2500, noPose: true }, { ms: 1500, p: 0 }, { ms: 4500, p: 0 }, ...cycle()]));
+      { ms: 2500, noPose: true }, ...STS_RESUME, ...cycle()]));
     expect(summary.reps).toBe(1);
     expect(attempts(log)).toHaveLength(1);
     const lostAt = log.events.find((e) => e.type === 'tracking_lost')!.t;
     const repsWhileLost = log.frames.filter((f) => f.t >= lostAt && !f.trackingOk).map((f) => f.rep);
     expect(new Set(repsWhileLost)).toEqual(new Set([0]));
+  });
+
+  it('recalibrates after Resume, so full stands still count when the camera moved during the pause', () => {
+    // As in the owner's manual set: covering the camera tilted the laptop lid, and afterwards the
+    // whole body sat 45 px lower in the picture at the same distance.
+    const tilted = (segs: StsSegment[]) => segs.map((s) => ('noPose' in s ? s : { ...s, shiftY: 45 }));
+    const { log, summary, result } = run(trace([...STS_SETTLE, ...cycle(), { ms: 1000, noPose: true },
+      ...tilted([...STS_RESUME, ...cycle(), ...cycle()])]));
+    expect(summary.reps).toBe(3);
+    expect(attempts(log).map((a) => a.counted)).toEqual([true, true, true]);
+    // The log keeps the calibration the set started with.
+    expect(result!.calibration.t).toBeLessThan(log.events.find((e) => e.type === 'tracking_lost')!.t);
   });
 
   it('does not count a stand followed by walking toward the camera, which looks like sitting down', () => {
@@ -267,7 +280,7 @@ describe('sit-to-stand set on synthetic traces', () => {
   });
 
   it('writes a log that validates against the schema, with progress, tempo and cue timing (AC 20, 21)', () => {
-    const { log } = run(trace([...STS_SETTLE, ...cycle(), ...cycle({ up: 1000 }), { ms: 800, noPose: true }, { ms: 2500, p: 0 },
+    const { log } = run(trace([...STS_SETTLE, ...cycle(), ...cycle({ up: 1000 }), { ms: 800, noPose: true }, ...STS_RESUME,
       { ms: 4500, p: 0 }, ...cycle()]));
     const parsed = SessionLogSchema.safeParse(log);
     expect(parsed.success, JSON.stringify(parsed.error?.issues.slice(0, 3))).toBe(true);

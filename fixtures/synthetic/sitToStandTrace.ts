@@ -169,10 +169,18 @@ export function sitToStandTrace(opts: StsTraceOptions): PoseTrace {
 export const STS_SETTLE: StsSegment[] = [
   { ms: 3600, p: 0 },
   { ms: 1500, from: 0, to: 1 },
-  { ms: 2600, p: 1 },
+  // 2 s for the hold, plus room for one restart when the still pose settles right at maxMotion.
+  { ms: 3500, p: 1 },
   { ms: 1500, from: 1, to: 0 },
   { ms: 2500, p: 0 },
 ];
+
+/**
+ * Back from tracking loss with Resume pressed as soon as it is offered: seated through the recovery
+ * (1 s), the short framing check (1 s) and the seated hold (2 s), then the standing hold and the
+ * sit-down during the countdown, as at the start of the set.
+ */
+export const STS_RESUME: StsSegment[] = [{ ms: 1200, p: 0 }, ...STS_SETTLE];
 
 /**
  * One sit, stand, sit cycle. `up` and `down` are the ramp durations; the measured rise and lower times

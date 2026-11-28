@@ -64,6 +64,12 @@ export interface Exercise {
   readonly state: string;
   readonly reps: number;
   readonly calibration: Baseline | null;
+  /**
+   * Calibrate again after Resume, instead of only the short framing check. Sit-to-stand does: its
+   * progress is measured in picture coordinates, so a camera moved during the pause would throw off
+   * counting (the owner's M2 manual set).
+   */
+  readonly recalibrateOnResume: boolean;
 
   /** This frame's measurements; called on reliable frames only. Always returns the same keys. */
   measure(f: PoseFrame): Measures;

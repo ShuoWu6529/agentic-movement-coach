@@ -1,6 +1,7 @@
 // Component tests of the M2 flow on trace-driven sources (PLANS.md §8 M2): the sit-to-stand set from
 // selection through two-stage calibration to the summary, with tempo shown in the summary (AC 11),
-// the counter per cycle (AC 5, AC 10), tracking loss (AC 16) and log export (AC 20).
+// the counter per cycle (AC 5, AC 10), tracking loss and recalibration on Resume (AC 16, 17) and log
+// export (AC 20).
 
 import { readFileSync } from 'node:fs';
 import { act, render, screen } from '@testing-library/react';
@@ -81,6 +82,14 @@ describe('sit-to-stand set in the app', () => {
     feed([{ ms: 500, noPose: true }]);
     expect(screen.getByRole('alert')).toHaveTextContent(/can't see you well/i);
     expectDisclaimer();
+
+    // Resume repeats the calibration holds; a resumed set offers End set there, not Back.
+    feed([{ ms: 1100, p: 0 }]);
+    await user.click(screen.getByRole('button', { name: /resume/i }));
+    expect(screen.getByRole('heading', { name: /get back into position/i })).toBeInTheDocument();
+    feed([{ ms: 1100, p: 0 }]);
+    expect(screen.getByRole('heading', { name: /sit still/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /back to exercises/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /end set/i }));
     expect(screen.getByRole('heading', { name: /set summary/i })).toBeInTheDocument();

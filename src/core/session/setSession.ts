@@ -7,7 +7,8 @@
 // - A bad frame in the active set closes the cue gate at once and discards the attempt in progress.
 //   If bad frames last `tracking.unreliableAfterMs`, the phase changes to trackingLost.
 // - In trackingLost, only status messages show. After `tracking.recoverAfterMs` of reliable frames the
-//   patient may Resume, which runs a short framing check and the countdown. Completed reps are kept.
+//   patient may Resume, which runs a short framing check and the countdown (sit-to-stand calibrates
+//   again first, both holds). Completed reps are kept.
 // - Losing tracking in calibration restarts calibration; in the countdown it returns to framing.
 // - The frame that completes the last repetition ends the set, unless an advice condition about the
 //   final attempt holds on it (a sit-to-stand lowered too fast, say). Then counting stops and the set
@@ -167,7 +168,14 @@ export class SetSession {
       case 'framing':
         framing = this.framing.step(f, gate);
         this.lastFraming = framing;
-        if (framing.passed && this.resuming) this.enterCountdown(t);
+        if (framing.passed && this.resuming) {
+          if (ex.recalibrateOnResume) {
+            ex.beginCalibration();
+            this.setPhase('calibration', t);
+          } else {
+            this.enterCountdown(t);
+          }
+        }
         break;
       case 'calibration':
         if (!gate.ok) {
@@ -177,7 +185,9 @@ export class SetSession {
           const s = ex.calibrate(f, m);
           calibrationProgress = s.progress;
           if (s.done) {
-            this.calibrated = ex.calibration;
+            // The log keeps the calibration the set started with; a recalibration after Resume shows
+            // as a calibration phase event, and replaying the pose trace reproduces its baseline.
+            this.calibrated ??= ex.calibration;
             this.enterCountdown(t);
           }
         }
